@@ -96,7 +96,7 @@ class DJProfilePage extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: IconButton(
-                        icon: FaIcon(social['icon'] as IconData),
+                        icon: FaIcon(social['icon']),  // ✅ Crée un Widget FaIcon à partir de FaIconData
                         iconSize: 32,
                         onPressed: () async {
                           final messenger = ScaffoldMessenger.maybeOf(context);
