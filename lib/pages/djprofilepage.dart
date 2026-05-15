@@ -100,8 +100,12 @@ class DJProfilePage extends StatelessWidget {
                         iconSize: 32,
                         onPressed: () async {
                           final messenger = ScaffoldMessenger.maybeOf(context);
-                          if (await canLaunchUrl(Uri.parse(social['url']!))) {
-                            await launchUrl(Uri.parse(social['url']!));
+                          final uri = Uri.parse(social['url']!);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication, // <--- Ajoute ça
+                            );
                           } else if (messenger != null) {
                             messenger.showSnackBar(
                               SnackBar(content: Text('Impossible d\'ouvrir ${social['url']!}')),
