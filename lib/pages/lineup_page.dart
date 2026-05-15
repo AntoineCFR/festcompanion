@@ -70,6 +70,9 @@ class _LineupPageState extends State<LineupPage> {
                 djData: {
                   'name': item.dj,
                   'bio': item.bio,
+                  'district': item.district,
+                  'startTime': item.startTime,
+                  'endTime': item.endTime,
                   'spotify_link': item.spotifyLink,
                   'soundcloud_link': item.soundcloudLink,
                   'instagram_link': item.instagramLink,
@@ -106,7 +109,7 @@ class _LineupPageState extends State<LineupPage> {
               '${AppUtils.formatTime(item.startTime)} - ${AppUtils.formatTime(item.endTime)}',
               style: const TextStyle(color: Colors.white70),
             ),
-            if (!AppDataManager().showFavoritesOnly)
+            if (AppDataManager().showFavoritesOnly) // <-- Affiché UNIQUEMENT en mode favoris
               Text(
                 item.district,
                 style: const TextStyle(

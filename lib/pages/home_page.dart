@@ -108,78 +108,77 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Accueil'),
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 100),
-              const Text(
-                'Extrema Outdoor 2026',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 100),
+            const Text(
+              'Extrema Outdoor 2026',
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildTimeUnit('Jours', days),
+                const Text(
+                  ' : ',
+                  style: TextStyle(fontSize: 24, color: Colors.white),
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildTimeUnit('Jours', days),
-                  const Text(
-                    ' : ',
-                    style: TextStyle(fontSize: 24, color: Colors.white),
-                  ),
-                  _buildTimeUnit('Heures', hours),
-                  const Text(
-                    ' : ',
-                    style: TextStyle(fontSize: 24, color: Colors.white),
-                  ),
-                  _buildTimeUnit('Minutes', minutes),
-                  const Text(
-                    ' : ',
-                    style: TextStyle(fontSize: 24, color: Colors.white),
-                  ),
-                  _buildTimeUnit('Secondes', seconds),
-                ],
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                'Premier set',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                _buildTimeUnit('Heures', hours),
+                const Text(
+                  ' : ',
+                  style: TextStyle(fontSize: 24, color: Colors.white),
                 ),
-                textAlign: TextAlign.center,
+                _buildTimeUnit('Minutes', minutes),
+                const Text(
+                  ' : ',
+                  style: TextStyle(fontSize: 24, color: Colors.white),
+                ),
+                _buildTimeUnit('Secondes', seconds),
+              ],
+            ),
+            const SizedBox(height: 30),
+            const Text(
+              'Premier set',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-              Text(
+              textAlign: TextAlign.center,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
                 '${AppUtils.formatFullDate(firstSetTimeLocal)} - ${AppUtils.formatTime(firstSetTimeLocal)}',
                 style: const TextStyle(fontSize: 16, color: Colors.white54),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
-              const SizedBox(height: 20),
-              if (_isLoadingWeather)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 20),
-                  child: CircularProgressIndicator(),
-                )
-              else if (_hasWeatherError || _forecasts.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 20),
-                  child: Text(
-                    'Météo non disponible',
-                    style: TextStyle(color: Colors.white54, fontSize: 16),
-                  ),
-                )
-              else
-                _buildWeatherSection(),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+            const SizedBox(height: 20),
+            if (_isLoadingWeather)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 20),
+                child: CircularProgressIndicator(),
+              )
+            else if (_hasWeatherError || _forecasts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 20),
+                child: Text(
+                  'Météo non disponible',
+                  style: TextStyle(color: Colors.white54, fontSize: 16),
+                ),
+              )
+            else
+              _buildWeatherSection(),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );
@@ -199,18 +198,17 @@ class _HomePageState extends State<HomePage> {
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
+            textAlign: TextAlign.center,
           ),
         ),
-        SizedBox(
-          height: 150,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _forecasts.length,
-            itemBuilder: (context, index) {
-              final forecast = _forecasts[index];
-              return _buildWeatherCard(forecast);
-            },
+        // Conteneur centré avec largeur fixe pour les 3 tuiles
+        Center(
+          child: SizedBox(
+            height: 150,
+            child: Row( // <-- Utilisation d'une Row au lieu de ListView
+              mainAxisAlignment: MainAxisAlignment.center, // Centre les enfants
+              children: _forecasts.map((forecast) => _buildWeatherCard(forecast)).toList(),
+            ),
           ),
         ),
       ],
@@ -219,7 +217,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildWeatherCard(WeatherForecast forecast) {
     return Container(
-      width: 110,
+      width: 100,
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.grey[800],
@@ -228,9 +226,9 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Stack(
         children: [
-          // 1. Jour (aligné en haut, centré horizontalement)
+          // 1. Jour
           Positioned(
-            top: 8, // Aligné sur le haut (après padding)
+            top: 8,
             left: 0,
             right: 0,
             child: Center(
@@ -244,10 +242,9 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-
-          // 2. Icône (centrée verticalement et horizontalement)
+          // 2. Icône
           Positioned(
-            top: 35, // (hauteur tuile - hauteur icône)/2 - hauteur température/2
+            top: 35,
             left: 0,
             right: 0,
             child: Image.network(
@@ -269,10 +266,9 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-
-          // 3. Température (bas aligné sur le haut de l'icône)
+          // 3. Température
           Positioned(
-            top: 77, // (hauteur tuile - hauteur icône)/2 - hauteur température/2
+            top: 77,
             left: 0,
             right: 0,
             child: Center(
@@ -286,13 +282,12 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-
-          // 4. Texte (haut aligné sur le bas de l'icône)
+          // 4. Description
           Positioned(
-            top: 103, // Aligné sur le bas de l'icône
+            top: 103,
             left: 0,
             right: 0,
-            child: Center( // ✅ Centre verticalement ET horizontalement dans la box
+            child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8.0),
                 child: Text(
@@ -301,7 +296,7 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.white70,
                     fontSize: 11,
                   ),
-                  textAlign: TextAlign.center, // ✅ Centre horizontalement le texte lui-même
+                  textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),

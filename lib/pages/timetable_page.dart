@@ -3,6 +3,7 @@ import '../models/timetable_item.dart';
 import '../services/app_data_manager.dart';
 import '../widgets/favorite_star.dart';
 import '../utils/utils.dart';
+import 'djprofilepage.dart';
 
 // --- Constants ---
 class _TimetableConstants {
@@ -326,46 +327,81 @@ class _DjCard extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height,
-      child: Card(
-        margin: _TimetableConstants.cardMargin,
-        color: isFavorite ? const Color(0xFF7851A9) : null,
-        child: Padding(
-          padding: _TimetableConstants.cardPadding,
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.dj,
-                      style: _TimetableConstants.djTextStyle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DJProfilePage(
+                djData: {
+                  'name': item.dj,
+                  'bio': item.bio,
+                  'district': item.district,
+                  'startTime': item.startTime,
+                  'endTime': item.endTime,
+                  'spotify_link': item.spotifyLink,
+                  'soundcloud_link': item.soundcloudLink,
+                  'instagram_link': item.instagramLink,
+                  'image_link': AppUtils.getDjImagePath(item.dj),
+                },
+              ),
+            ),
+          );
+        },
+        child: Card(
+          margin: _TimetableConstants.cardMargin,
+          color: isFavorite ? const Color(0xFF7851A9) : null,
+          child: Padding(
+            padding: _TimetableConstants.cardPadding,
+            child: Row(
+              children: [
+                if (width >= 60)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4.0),
+                    child: Image.asset(
+                      AppUtils.getDjImagePath(item.dj),
+                      width: height - 8,
+                      height: height - 8,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.person, color: Colors.white54, size: 20),
                     ),
-                    Text(
-                      '${AppUtils.formatTime(item.startTime)} - ${AppUtils.formatTime(item.endTime)}',
-                      style: _TimetableConstants.timeTextStyle,
-                      maxLines: 1,
-                    ),
-                    if (height == _TimetableConstants.favoriteTileHeight)
+                  ),
+                if (width >= 60) const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        item.district,
-                        style: _TimetableConstants.districtSubtitleStyle,
+                        item.dj,
+                        style: _TimetableConstants.djTextStyle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                  ],
+                      Text(
+                        '${AppUtils.formatTime(item.startTime)} - ${AppUtils.formatTime(item.endTime)}',
+                        style: _TimetableConstants.timeTextStyle,
+                        maxLines: 1,
+                      ),
+                      if (height == _TimetableConstants.favoriteTileHeight)
+                        Text(
+                          item.district,
+                          style: _TimetableConstants.districtSubtitleStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              Center(
-                child: FavoriteStar(
-                  isFavorite: isFavorite,
-                  onPressed: onToggleFavorite,
+                Center(
+                  child: FavoriteStar(
+                    isFavorite: isFavorite,
+                    onPressed: onToggleFavorite,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

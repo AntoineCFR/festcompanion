@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../utils/utils.dart'; // Import pour AppUtils.formatTime
 
 class DJProfilePage extends StatelessWidget {
   final Map<String, dynamic> djData;
@@ -43,6 +44,27 @@ class DJProfilePage extends StatelessWidget {
                 fit: BoxFit.fitWidth,
                 alignment: Alignment.topCenter,
                 errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (djData['district'] != null)
+                    Text(
+                      '${djData['district']}',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  if (djData['startTime'] != null && djData['endTime'] != null)
+                    Text(
+                      '${AppUtils.formatTime(djData['startTime'])} - ${AppUtils.formatTime(djData['endTime'])}',
+                      style: const TextStyle(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
