@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- ✅ Autorise toutes les connexions HTTPS (pour le développement) -->
+    <base-config cleartextTrafficPermitted="false">  <!-- ✅ Désactive le HTTP (sécurité) -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- ✅ Autorise spécifiquement ton domaine (Render) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">extremalineup.onrender.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
