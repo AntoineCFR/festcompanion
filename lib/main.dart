@@ -1,16 +1,24 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart'; // Généré par flutterfire configure
 import 'services/app_data_manager.dart';
-import 'services/local_storage_service.dart'; // ✅ Ajoute cet import
+import 'services/local_storage_service.dart';
 import 'pages/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LocalStorageService().init(); // ✅ Initialise SharedPreferences AVANT tout
+  await LocalStorageService().init(); // Initialise SharedPreferences AVANT tout
+
+  // Initialisation Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const MyApp());
 }
 
-// ✅ Crée un GlobalKey pour ScaffoldMessenger
+// Crée un GlobalKey pour ScaffoldMessenger
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 class MyApp extends StatefulWidget {
