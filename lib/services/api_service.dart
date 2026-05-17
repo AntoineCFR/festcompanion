@@ -87,4 +87,70 @@ class ApiService {
       throw Exception('Échec de la sauvegarde des favoris: $e');
     }
   }
+
+  static Future<List<Map<String, dynamic>>> fetchUsers() async {
+    try {
+      final url = Uri.parse('$_baseUrl/users');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((user) => {
+          'id': user['id'],
+          'username': user['username'] ?? '',
+          'phone_number': user['phone_number']?.toString() ?? '',
+          'last_lat': user['last_lat'] ?? 0.0,
+          'last_lng': user['last_lng'] ?? 0.0,
+        }).toList();
+      } else {
+        throw Exception(
+          'Échec fetchUsers: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec du chargement des utilisateurs: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateUserPhone(int userId, String phoneNumber) async {
+    try {
+      final url = Uri.parse('$_baseUrl/users/$userId/phone');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'phone_number': phoneNumber,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body); // Retourne la réponse du backend
+      } else {
+        throw Exception('Erreur: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Erreur de connexion: $e');
+    }
+  }
+  static Future<Map<String, dynamic>> updateUserLocation(int userId, double lat, double lng) async {
+    try {
+      final url = Uri.parse('$_baseUrl/users/$userId/location');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'lat': lat,
+          'lng': lng,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Erreur: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Erreur de connexion: $e');
+    }
+  }
 }

@@ -1,3 +1,4 @@
+// lib/pages/lineup_page.dart
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
 import '../services/app_data_manager.dart';
@@ -109,7 +110,7 @@ class _LineupPageState extends State<LineupPage> {
               '${AppUtils.formatTime(item.startTime)} - ${AppUtils.formatTime(item.endTime)}',
               style: const TextStyle(color: Colors.white70),
             ),
-            if (AppDataManager().showFavoritesOnly) // <-- Affiché UNIQUEMENT en mode favoris
+            if (AppDataManager().showFavoritesOnly)
               Text(
                 item.district,
                 style: const TextStyle(
@@ -153,12 +154,9 @@ class _LineupPageState extends State<LineupPage> {
       }
     });
 
-    return Scaffold(
-      backgroundColor: Colors.grey[900],
-      appBar: AppBar(
-        title: const Text('Line-up'),
-      ),
-      body: Column(
+    return Container(
+      color: Colors.grey[900],
+      child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),

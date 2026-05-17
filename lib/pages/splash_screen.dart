@@ -5,74 +5,150 @@ import '../services/auth_service.dart';
 import 'login_page.dart';
 import 'splash_login.dart';
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  void _showSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: AppDataManager().loadTimetable(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Colors.grey,
-            body: Center(
+    return Scaffold(
+      backgroundColor: Colors.grey[900],
+      body: FutureBuilder<Map<String, dynamic>?>(
+        future: AuthService.getSavedLogin(),
+        builder: (context, savedUserSnapshot) {
+          if (savedUserSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 20),
                   Text(
-                    'Chargement de la timetable...',
+                    'Vérification de la connexion...',
                     style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ],
               ),
-            ),
-          );
-        } else if (snapshot.hasError) {
-          return Scaffold(
-            backgroundColor: Colors.grey[900],
-            body: Center(
+            );
+          }
+
+          if (savedUserSnapshot.hasError) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _showSnackBar('Erreur de connexion : ${savedUserSnapshot.error}');
+              }
+            });
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.error, color: Colors.red, size: 40),
                   const SizedBox(height: 20),
                   Text(
-                    'Erreur de chargement : ${snapshot.error}',
+                    'Erreur de connexion',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (context) => const SplashScreen()),
-                      );
-                    },
+                    onPressed: () => setState(() {}),
                     child: const Text('Réessayer'),
                   ),
                 ],
               ),
-            ),
-          );
-        } else {
-          // ✅ Utilise FutureBuilder pour gérer AuthService.getSavedLogin()
-          return FutureBuilder<Map<String, dynamic>?>(
-            future: AuthService.getSavedLogin(),
-            builder: (context, savedUserSnapshot) {
-              if (savedUserSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  backgroundColor: Colors.grey,
-                  body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final savedUser = savedUserSnapshot.data;
+          if (savedUser == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              }
+            });
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 20),
+                  Text(
+                    'Redirection vers la page de connexion...',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          // ✅ Charge UNIQUEMENT les données globales (timetable + utilisateurs)
+          return FutureBuilder(
+            future: AppDataManager().loadAllData(),  // ✅ Plus de userId
+            builder: (context, dataSnapshot) {
+              if (dataSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 20),
+                      Text(
+                        'Chargement des données globales...',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ],
+                  ),
                 );
               }
 
-              final savedUser = savedUserSnapshot.data;
+              if (dataSnapshot.hasError) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    _showSnackBar('Erreur de chargement : ${dataSnapshot.error}');
+                  }
+                });
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, color: Colors.red, size: 40),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Impossible de charger les données globales',
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () => setState(() {}),
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // ✅ Redirige vers SplashLogin (qui chargera les favoris de l'utilisateur)
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (savedUser != null) {
-                  // ✅ Accède aux valeurs via les clés du Map
+                if (mounted) {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
                       builder: (context) => SplashLogin(
@@ -81,33 +157,26 @@ class SplashScreen extends StatelessWidget {
                       ),
                     ),
                   );
-                } else {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                  );
                 }
               });
 
-              return const Scaffold(
-                backgroundColor: Colors.grey,
-                body: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 20),
-                      Text(
-                        'Prêt !',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ],
-                  ),
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    Text(
+                      'Prêt !',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
                 ),
               );
             },
           );
-        }
-      },
+        },
+      ),
     );
   }
 }

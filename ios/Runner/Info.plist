@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Festcompanion</string>
+	<string>Festival Companion</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Cette application a besoin d’accéder à votre position pour fonctionner correctement.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Cette application a besoin d’accéder à votre position même en arrière-plan.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

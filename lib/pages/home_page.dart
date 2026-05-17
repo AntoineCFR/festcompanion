@@ -1,4 +1,6 @@
+// lib/pages/home_page.dart
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../models/timetable_item.dart';
 import '../models/weather_model.dart';
@@ -77,16 +79,43 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ✅ NOUVELLE MÉTHODE : Gère l'ouverture du lien Google Maps
+  Future<void> _openLocation() async {
+    if (!mounted) return;
+
+    final url = Uri.parse('https://www.google.com/maps?q=51.026997,5.443735');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Impossible d\'ouvrir le lien vers Google Maps.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de l\'ouverture du lien.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     if (_firstSetItem == null) {
-      return Scaffold(
-        backgroundColor: Colors.grey[900],
-        appBar: AppBar(
-          title: const Text('Accueil'),
-        ),
-        body: const Center(
+      return Container(
+        color: Colors.grey[900],
+        child: const Center(
           child: Text(
             'Aucun set trouvé',
             style: TextStyle(color: Colors.white, fontSize: 18),
@@ -102,12 +131,9 @@ class _HomePageState extends State<HomePage> {
     final minutes = difference.inMinutes % 60;
     final seconds = difference.inSeconds % 60;
 
-    return Scaffold(
-      backgroundColor: Colors.grey[900],
-      appBar: AppBar(
-        title: const Text('Accueil'),
-      ),
-      body: SingleChildScrollView(
+    return Container(
+      color: Colors.grey[900],
+      child: SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -177,6 +203,25 @@ class _HomePageState extends State<HomePage> {
               )
             else
               _buildWeatherSection(),
+            // ✅ NOUVEAU : Icône de localisation sous la météo
+            Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.location_on, color: Colors.white, size: 30),
+                    onPressed: _openLocation, // ✅ Appel de la méthode dédiée
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Parking Camping',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -201,12 +246,11 @@ class _HomePageState extends State<HomePage> {
             textAlign: TextAlign.center,
           ),
         ),
-        // Conteneur centré avec largeur fixe pour les 3 tuiles
         Center(
           child: SizedBox(
             height: 150,
-            child: Row( // <-- Utilisation d'une Row au lieu de ListView
-              mainAxisAlignment: MainAxisAlignment.center, // Centre les enfants
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: _forecasts.map((forecast) => _buildWeatherCard(forecast)).toList(),
             ),
           ),
@@ -226,7 +270,6 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Stack(
         children: [
-          // 1. Jour
           Positioned(
             top: 8,
             left: 0,
@@ -242,7 +285,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          // 2. Icône
           Positioned(
             top: 35,
             left: 0,
@@ -266,7 +308,6 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-          // 3. Température
           Positioned(
             top: 77,
             left: 0,
@@ -282,7 +323,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          // 4. Description
           Positioned(
             top: 103,
             left: 0,

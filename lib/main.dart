@@ -6,6 +6,8 @@ import 'services/app_data_manager.dart';
 import 'services/local_storage_service.dart';
 import 'pages/splash_screen.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(); // ✅ Pour precacheImage
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalStorageService().init(); // Initialise SharedPreferences AVANT tout
@@ -55,6 +57,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       title: 'Extrema Outdoor 2026',
       theme: ThemeData.dark(),
       scaffoldMessengerKey: scaffoldMessengerKey,
+      navigatorKey: navigatorKey, // ✅ Ajoute cette ligne
       home: const SplashScreen(),
     );
   }

@@ -1,3 +1,4 @@
+// lib/pages/timetable_page.dart
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
 import '../services/app_data_manager.dart';
@@ -235,12 +236,9 @@ class _TimetablePageState extends State<TimetablePage> {
 
     final displayItems = _getFilteredItems(timetable);
     if (displayItems.isEmpty) {
-      return Scaffold(
-        backgroundColor: Colors.grey[900],
-        appBar: AppBar(
-          title: const Text('Timetable'),
-        ),
-        body: _buildEmptyState(),
+      return Container(
+        color: Colors.grey[900],
+        child: _buildEmptyState(),
       );
     }
 
@@ -249,12 +247,9 @@ class _TimetablePageState extends State<TimetablePage> {
     final totalWidth = maxEndTime.difference(minStartTime).inMinutes * _TimetableConstants.pixelsPerMinute;
     final offsetInPixels = _calculateOffset(minStartTime);
 
-    return Scaffold(
-      backgroundColor: Colors.grey[900],
-      appBar: AppBar(
-        title: const Text('Timetable'),
-      ),
-      body: Column(
+    return Container(
+      color: Colors.grey[900],
+      child: Column(
         children: [
           _buildControls(),
           Expanded(
