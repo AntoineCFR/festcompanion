@@ -1,7 +1,7 @@
-// lib/services/app_data_manager.dart
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/timetable_item.dart';
+import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/profile_service.dart';
@@ -21,7 +21,7 @@ class AppDataManager {
 
   // Données globales (indépendantes de l'utilisateur)
   List<TimetableItem> _timetable = [];
-  List<Map<String, dynamic>> _users = [];
+  List<User> _users = [];
   Map<int, String?> _photoUrls = {};
 
   // Données utilisateur (dépendent de l'utilisateur connecté)
@@ -34,6 +34,14 @@ class AppDataManager {
   // Setter pour le GlobalKey
   void setScaffoldMessengerKey(GlobalKey<ScaffoldMessengerState> key) {
     _scaffoldMessengerKey = key;
+  }
+
+  void showSnackBar(String message) {
+    if (_scaffoldMessengerKey?.currentState != null) {
+      _scaffoldMessengerKey!.currentState!.showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   // Affiche un message d'erreur
@@ -52,8 +60,8 @@ class AppDataManager {
 
   // Getters pour les données globales
   List<TimetableItem> get timetable => _timetable;
-  List<Map<String, dynamic>> get users => _users;
-  String? getPhotoUrl(int userId) => _photoUrls[userId];
+  List<User> get users => _users;
+  Map<int, String?> get photoUrls => _photoUrls;
 
   // Getters pour les données utilisateur
   Set<int> get favoriteSetIds => _favoriteSetIds;
@@ -61,11 +69,11 @@ class AppDataManager {
   bool get showFavoritesOnly => _showFavoritesOnly;
   int? get userId => _userId;
 
-  // ✅ Charge les données GLOBALES (timetable + utilisateurs + photos)
-  Future<void> loadAllData() async {  // ✅ Plus de paramètre userId
+  // ✅ Charge les données GLOBALES (timetable + utilisateurs)
+  Future<void> loadAllData() async {
     try {
       await loadTimetable();
-      await loadUsers();  // ✅ Charge les utilisateurs et leurs photos
+      await loadUsers();
     } catch (e) {
       _showErrorMessage('Erreur lors du chargement des données globales : $e');
       rethrow;
@@ -84,14 +92,14 @@ class AppDataManager {
     }
   }
 
-  // ✅ Charge les utilisateurs et leurs photos (globales)
+  // ✅ Charge les utilisateurs (globaux)
   Future<void> loadUsers() async {
     try {
-      _users = await ApiService.fetchUsers();
+      _users = (await ApiService.fetchUsers()).map((map) => User.fromMap(map)).toList();
       _photoUrls.clear();
 
       for (final user in _users) {
-        final int userId = user['id'] as int;
+        final int userId = user.id;
         final photoUrl = await ProfileService.getPhotoUrl(userId);
         _photoUrls[userId] = photoUrl;
 
@@ -107,8 +115,9 @@ class AppDataManager {
     }
   }
 
+
   // ✅ Charge les favoris (spécifiques à l'utilisateur)
-  Future<void> loadFavorites(int userId) async {  // ✅ Prend userId en paramètre
+  Future<void> loadFavorites(int userId) async {
     try {
       _userId = userId;
       final serverFavorites = await ApiService.fetchFavorites(userId);
@@ -124,34 +133,32 @@ class AppDataManager {
   // Méthode d'initialisation (pour compatibilité)
   Future<void> init(int userId) async {
     await loadTimetable();
-    await loadFavorites(userId);  // ✅ Charge les favoris de l'utilisateur
+    await loadFavorites(userId);
     _selectedDay = await LocalStorageService().getSelectedDay();
     _showFavoritesOnly = await LocalStorageService().getShowFavoritesOnly();
   }
 
   // ✅ Met à jour la photo d'un utilisateur
   void updateUserPhoto(int userId, String? photoUrl) {
-    _photoUrls[userId] = photoUrl;
-    final userIndex = _users.indexWhere((u) => u['id'] == userId);
-    if (userIndex != -1) {
-      _users[userIndex]['photo_url'] = photoUrl;
+    final index = _users.indexWhere((u) => u.id == userId);
+    if (index != -1) {
+      _users[index] = _users[index].copyWith(photoUrl: photoUrl);
     }
   }
 
   // ✅ Met à jour la localisation d'un utilisateur
   void updateUserLocation(int userId, double lat, double lng) {
-    final userIndex = _users.indexWhere((u) => u['id'] == userId);
-    if (userIndex != -1) {
-      _users[userIndex]['last_lat'] = lat;
-      _users[userIndex]['last_lng'] = lng;
+    final index = _users.indexWhere((u) => u.id == userId);
+    if (index != -1) {
+      _users[index] = _users[index].copyWith(lastLat: lat, lastLng: lng);
     }
   }
 
   // ✅ Met à jour le téléphone d'un utilisateur
   void updateUserPhone(int userId, String phoneNumber) {
-    final userIndex = _users.indexWhere((u) => u['id'] == userId);
-    if (userIndex != -1) {
-      _users[userIndex]['phone_number'] = phoneNumber;
+    final index = _users.indexWhere((u) => u.id == userId);
+    if (index != -1) {
+      _users[index] = _users[index].copyWith(phoneNumber: phoneNumber);
     }
   }
 
@@ -163,7 +170,6 @@ class AppDataManager {
     _selectedDay = 'friday';
     _showFavoritesOnly = false;
     _users = [];
-    _photoUrls = {};
   }
 
   void setSelectedDay(String day) {

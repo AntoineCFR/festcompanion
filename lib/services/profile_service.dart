@@ -1,4 +1,4 @@
-// lib/services/profile_service.dart
+// Dans profile_service.dart
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 
 class ProfileService {
@@ -6,12 +6,9 @@ class ProfileService {
     try {
       final ref = firebase_storage.FirebaseStorage.instance
           .ref()
-          .child('user_photos/$userId.jpg');
-      final url = await ref.getDownloadURL();
-      print('✅ URL générée: $url'); // ✅ Debug
-      return url;
+          .child('user_photos/$userId.jpg');  // ✅ Chemin vers le fichier
+      return await ref.getDownloadURL();  // ✅ Génère une URL avec token
     } catch (e) {
-      print('❌ Erreur getPhotoUrl: $e'); // ✅ Debug
       return null;
     }
   }

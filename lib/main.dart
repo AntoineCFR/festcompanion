@@ -1,12 +1,13 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // Généré par flutterfire configure
+import 'firebase_options.dart';
 import 'services/app_data_manager.dart';
 import 'services/local_storage_service.dart';
 import 'pages/splash_screen.dart';
 
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(); // ✅ Pour precacheImage
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(); // Pour precacheImage
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>(); // Pour les SnackBars
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,11 +18,11 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // ✅ Initialise le ScaffoldMessengerKey dans AppDataManager
+  AppDataManager().setScaffoldMessengerKey(scaffoldMessengerKey);
+
   runApp(const MyApp());
 }
-
-// Crée un GlobalKey pour ScaffoldMessenger
-final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -35,7 +36,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    AppDataManager().setScaffoldMessengerKey(scaffoldMessengerKey);
   }
 
   @override
@@ -57,7 +57,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       title: 'Extrema Outdoor 2026',
       theme: ThemeData.dark(),
       scaffoldMessengerKey: scaffoldMessengerKey,
-      navigatorKey: navigatorKey, // ✅ Ajoute cette ligne
+      navigatorKey: navigatorKey,
       home: const SplashScreen(),
     );
   }

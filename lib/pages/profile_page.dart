@@ -1,13 +1,13 @@
-// lib/pages/profile_page.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
-import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:io';
 import '../services/app_data_manager.dart';
-import '../services/api_service.dart';
+import '../models/user_model.dart';
+import '../models/profile_data_model.dart';
+import '../widgets/profile/profile_app_bar.dart';
+import '../widgets/profile/profile_photo.dart';
+import '../widgets/profile/profile_text_field.dart';
+import '../widgets/profile/location_toggle.dart';
+import '../widgets/profile/coordinates_section.dart';
+import '../helpers/profile_helper.dart';
 
 class ProfilePage extends StatefulWidget {
   final String username;
@@ -25,23 +25,17 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController _phoneController = TextEditingController();
-  bool _locationEnabled = false;
-  bool _isUploading = false;
+  ProfileData? _profileData;
+  bool _isLoading = true; // ✅ État de chargement explicite
 
-  // ✅ Méthode centralisée et sécurisée pour les SnackBars
   void _showSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    }
+    AppDataManager().showSnackBar(message);
   }
 
   @override
   void initState() {
     super.initState();
-    _loadLocationEnabled();
-    _initUserData();
+    _initData();
   }
 
   @override
@@ -50,61 +44,72 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
-  Future<void> _loadLocationEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _locationEnabled = prefs.getBool('location_enabled') ?? false;
-      });
-    }
-  }
-
-  Future<void> _saveLocationEnabled(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('location_enabled', value);
-  }
-
-  void _initUserData() {
-    final appData = AppDataManager();
-    final user = appData.users.firstWhere(
-      (u) => u['id'] == widget.userId,
-      orElse: () => <String, dynamic>{},
-    );
-    _phoneController.text = user['phone_number']?.toString() ?? '';
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _uploadPhoto() async {
+  Future<void> _initData() async {
     if (!mounted) return;
 
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image == null || !mounted) return;
-
-    setState(() => _isUploading = true);
     try {
-      final ref = firebase_storage.FirebaseStorage.instance
-          .ref()
-          .child('user_photos/${widget.userId}.jpg');
-      await ref.putFile(File(image.path));
-
-      if (!mounted) return;
-      final photoUrl = await ref.getDownloadURL();
-
-      final appData = AppDataManager();
-      appData.updateUserPhoto(widget.userId, photoUrl);
-
-      if (mounted) {
-        setState(() => _isUploading = false);
-        _showSnackBar('Photo mise à jour !');
-      }
+      final locationEnabled = await ProfileHelper.loadLocationEnabled();
+      final user = AppDataManager().users.firstWhere(
+        (u) => u.id == widget.userId,
+        orElse: () => User(id: widget.userId, username: widget.username),
+      );
+      setState(() {
+        _profileData = ProfileData(
+          user: user,
+          locationEnabled: locationEnabled,
+        );
+        _phoneController.text = _profileData!.phoneNumber ?? '';
+        _isLoading = false; // ✅ Chargement terminé
+      });
     } catch (e) {
       if (mounted) {
-        setState(() => _isUploading = false);
-        _showSnackBar('Erreur : $e');
+        setState(() => _isLoading = false); // ✅ Désactive le chargement même en cas d'erreur
+        _showSnackBar('Erreur lors du chargement : $e');
       }
+    }
+  }
+
+  Future<void> _handlePhotoUpload(String? photoUrl) async {
+    if (!mounted || photoUrl == null) return;
+
+    try {
+      AppDataManager().updateUserPhoto(widget.userId, photoUrl);
+      setState(() {
+        _profileData = _profileData?.copyWith(
+          user: _profileData!.user.copyWith(photoUrl: photoUrl),
+          isUploading: false,
+        );
+      });
+      _showSnackBar('Photo mise à jour !');
+    } catch (e) {
+      _showSnackBar('Erreur : $e');
+    }
+  }
+
+  Future<void> _handleLocationToggle(bool value) async {
+    if (!mounted) return;
+
+    if (value) {
+      try {
+        await ProfileHelper.refreshLocation(widget.userId);
+        setState(() {
+          _profileData = _profileData?.copyWith(
+            locationEnabled: true,
+            user: AppDataManager().users.firstWhere(
+              (u) => u.id == widget.userId,
+              orElse: () => _profileData!.user,
+            ),
+          );
+        });
+        await ProfileHelper.saveLocationEnabled(true);
+        _showSnackBar('Localisation activée et sauvegardée !');
+      } catch (e) {
+        setState(() => _profileData = _profileData?.copyWith(locationEnabled: false));
+        _showSnackBar('Erreur de localisation : $e');
+      }
+    } else {
+      setState(() => _profileData = _profileData?.copyWith(locationEnabled: false));
+      await ProfileHelper.saveLocationEnabled(false);
     }
   }
 
@@ -112,31 +117,20 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
 
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission != LocationPermission.whileInUse &&
-            permission != LocationPermission.always) {
-          _showSnackBar('Autorisation de localisation refusée.');
-          return;
-        }
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      if (mounted) {
-        final appData = AppDataManager();
-        appData.updateUserLocation(widget.userId, position.latitude, position.longitude);
-        await ApiService.updateUserLocation(
-          widget.userId,
-          position.latitude,
-          position.longitude,
+      setState(() => _profileData = _profileData?.copyWith(isUploading: true));
+      await ProfileHelper.refreshLocation(widget.userId);
+      setState(() {
+        _profileData = _profileData?.copyWith(
+          isUploading: false,
+          user: AppDataManager().users.firstWhere(
+            (u) => u.id == widget.userId,
+            orElse: () => _profileData!.user,
+          ),
         );
-        _showSnackBar('Localisation rafraîchie et sauvegardée !');
-      }
+      });
+      _showSnackBar('Localisation rafraîchie et sauvegardée !');
     } catch (e) {
+      setState(() => _profileData = _profileData?.copyWith(isUploading: false));
       _showSnackBar('Erreur : $e');
     }
   }
@@ -145,11 +139,12 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
 
     try {
-      await ApiService.updateUserPhone(widget.userId, _phoneController.text);
-
-      final appData = AppDataManager();
-      appData.updateUserPhone(widget.userId, _phoneController.text);
-
+      await ProfileHelper.saveProfile(widget.userId, _phoneController.text);
+      setState(() {
+        _profileData = _profileData?.copyWith(
+          user: _profileData!.user.copyWith(phoneNumber: _phoneController.text),
+        );
+      });
       _showSnackBar('Numéro de téléphone mis à jour !');
     } catch (e) {
       _showSnackBar('Erreur: $e');
@@ -158,23 +153,36 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final appData = AppDataManager();
-    final user = appData.users.firstWhere(
-      (u) => u['id'] == widget.userId,
-      orElse: () => <String, dynamic>{},
-    );
-    final photoUrl = appData.getPhotoUrl(widget.userId);
+    // ✅ Gestion des états de chargement et d'erreur
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mon compte'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveProfile,
+    if (_profileData == null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, color: Colors.red, size: 40),
+              const SizedBox(height: 20),
+              const Text('Impossible de charger le profil'),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _initData, // ✅ Bouton pour réessayer
+                child: const Text('Réessayer'),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    final profile = _profileData!;
+    return Scaffold(
+      appBar: ProfileAppBar(onSavePressed: _saveProfile),
       body: Container(
         color: Colors.grey[900],
         child: Padding(
@@ -182,26 +190,10 @@ class _ProfilePageState extends State<ProfilePage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // Photo de profil
-                GestureDetector(
-                  onTap: _uploadPhoto,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey[800],
-                        backgroundImage: photoUrl != null
-                            ? CachedNetworkImageProvider(photoUrl)
-                            : null,
-                        child: photoUrl == null
-                            ? const Icon(Icons.camera_alt, size: 40, color: Colors.white54)
-                            : null,
-                      ),
-                      if (_isUploading)
-                        const CircularProgressIndicator(),
-                    ],
-                  ),
+                ProfilePhoto(
+                  userId: widget.userId,
+                  onPhotoUploaded: _handlePhotoUpload,
+                  isUploading: profile.isUploading,
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -209,179 +201,34 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(color: Colors.white54),
                 ),
                 const SizedBox(height: 30),
-
-                // Champ username
-                TextField(
-                  decoration: InputDecoration(
-                    labelText: 'Nom d\'utilisateur',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    disabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[800],
-                  ),
-                  style: const TextStyle(color: Colors.white),
+                ProfileTextField(
+                  labelText: 'Nom d\'utilisateur',
                   controller: TextEditingController(text: widget.username),
                   enabled: false,
                 ),
                 const SizedBox(height: 16),
-
-                // Champ user_id
-                TextField(
-                  decoration: InputDecoration(
-                    labelText: 'ID Utilisateur',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    disabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[800],
-                  ),
-                  style: const TextStyle(color: Colors.white),
+                ProfileTextField(
+                  labelText: 'ID Utilisateur',
                   controller: TextEditingController(text: widget.userId.toString()),
                   enabled: false,
                 ),
                 const SizedBox(height: 16),
-
-                // Numéro de téléphone
-                TextField(
-                  decoration: InputDecoration(
-                    labelText: 'Numéro de téléphone',
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    hintText: 'Format : +33 1 23 45 67 89',
-                    hintStyle: const TextStyle(color: Colors.white54, fontSize: 12),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.blue[700]!),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[800],
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.phone,
+                ProfileTextField(
+                  labelText: 'Numéro de téléphone',
+                  hintText: 'Format : +33 1 23 45 67 89',
                   controller: _phoneController,
+                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 16),
-
-                // Toggle localisation
-                Row(
-                  children: [
-                    const Text(
-                      'Activer la localisation',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    const Spacer(),
-                    Switch(
-                      value: _locationEnabled,
-                      onChanged: (bool value) async {
-                        if (value) {
-                          LocationPermission permission = await Geolocator.checkPermission();
-                          if (permission == LocationPermission.denied) {
-                            permission = await Geolocator.requestPermission();
-                            if (permission != LocationPermission.whileInUse &&
-                                permission != LocationPermission.always) {
-                              _showSnackBar('Autorisation de localisation refusée. Impossible d\'activer.');
-                              return;
-                            }
-                          }
-                          try {
-                            final position = await Geolocator.getCurrentPosition(
-                              desiredAccuracy: LocationAccuracy.high,
-                            );
-                            if (mounted) {
-                              setState(() {
-                                _locationEnabled = true;
-                              });
-                              await _saveLocationEnabled(true);
-                              final appData = AppDataManager();
-                              appData.updateUserLocation(
-                                widget.userId,
-                                position.latitude,
-                                position.longitude,
-                              );
-                              await ApiService.updateUserLocation(
-                                widget.userId,
-                                position.latitude,
-                                position.longitude,
-                              );
-                              _showSnackBar('Localisation activée et sauvegardée !');
-                            }
-                          } catch (e) {
-                            _showSnackBar('Erreur de localisation : $e');
-                            return;
-                          }
-                        } else {
-                          setState(() {
-                            _locationEnabled = false;
-                          });
-                          await _saveLocationEnabled(false);
-                        }
-                      },
-                      activeThumbColor: Colors.blue,
-                    ),
-                  ],
+                LocationToggle(
+                  value: profile.locationEnabled,
+                  onChanged: _handleLocationToggle,
+                  onLocationRefresh: _refreshLocation,
                 ),
                 const SizedBox(height: 16),
-
-                // Latitude et Longitude
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Latitude',
-                          labelStyle: const TextStyle(color: Colors.white70),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          disabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[800],
-                        ),
-                        style: const TextStyle(color: Colors.white),
-                        controller: TextEditingController(
-                          text: user['last_lat']?.toStringAsFixed(6) ?? '',
-                        ),
-                        enabled: false,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.white),
-                      onPressed: _refreshLocation,
-                    ),
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Longitude',
-                          labelStyle: const TextStyle(color: Colors.white70),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          disabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[800],
-                        ),
-                        style: const TextStyle(color: Colors.white),
-                        controller: TextEditingController(
-                          text: user['last_lng']?.toStringAsFixed(6) ?? '',
-                        ),
-                        enabled: false,
-                      ),
-                    ),
-                  ],
+                CoordinatesSection(
+                  latitude: profile.latitude,
+                  longitude: profile.longitude,
                 ),
                 const SizedBox(height: 20),
               ],

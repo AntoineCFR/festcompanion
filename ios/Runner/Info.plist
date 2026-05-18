@@ -30,8 +30,12 @@
     <string>Cette application utilise votre position en arrière-plan pour afficher votre emplacement sur la carte et partager votre localisation avec vos amis.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>tel</string>          <!-- Pour les appels -->
-		<string>geo</string>          <!-- Pour les liens Google Maps (geo:) -->
+		<string>tel</string>          <!-- ✅ Appels téléphoniques -->
+        <string>geo</string>          <!-- ✅ Liens Google Maps (geo:) -->
+        <string>https</string>        <!-- ✅ Liens web (Spotify, SoundCloud, Instagram) -->
+        <string>spotify</string>      <!-- ✅ App Spotify -->
+        <string>instagram</string>    <!-- ✅ App Instagram -->
+        <string>soundcloud</string>   <!-- ✅ App SoundCloud -->
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
