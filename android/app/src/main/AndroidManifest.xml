@@ -2,9 +2,29 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CALL_PHONE" />  <!-- ✅ Permission pour les appels -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />  <!-- ✅ Localisation précise -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> <!-- ✅ Localisation approximative -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />  <!-- ✅ Localisation précise -->
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="33" /> <!-- ✅ minSdkVersion >= 21 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <queries>
+        <!-- Google Maps (liens https://) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="www.google.com" />
+        </intent>
+        <!-- Google Maps (liens geo:) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+        <!-- Appels téléphoniques -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
     <application
         android:label="Festival Companion"
         android:name="${applicationName}"

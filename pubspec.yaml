@@ -22,6 +22,9 @@ dependencies:
   geolocator: ^10.0.0
   cached_network_image: ^3.3.0
   clipboard: ^0.1.3  # ✅ Pour copier le numéro dans le presse-papier
+  workmanager: ^0.5.1  # Pour Android
+  background_fetch: ^1.2.0  # Pour iOS
+  android_alarm_manager_plus: ^2.0.5  # Alternative plus précise pour Android (optionnel)
 
 dev_dependencies:
   flutter_test:
