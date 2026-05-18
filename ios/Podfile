@@ -1,0 +1,13 @@
+# Uncomment this line to define a global platform for your project
+platform :ios, '14.0'
+
+# The target name is the name of your app's main target (usually "Runner")
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  # Pods for Runner
+end
+
+# Add this line at the end to use Flutter's CocoaPods integration
+install_all_flutter_pods(GeneratedPluginRegistrant)
