@@ -5,11 +5,13 @@ import 'firebase_options.dart';
 import 'services/app_data_manager.dart';
 import 'services/local_storage_service.dart';
 import 'pages/splash_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>(); // Pour precacheImage
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>(); // Pour les SnackBars
 
 void main() async {
+  await dotenv.load(fileName: ".env");
   WidgetsFlutterBinding.ensureInitialized();
   await LocalStorageService().init(); // Initialise SharedPreferences AVANT tout
 
