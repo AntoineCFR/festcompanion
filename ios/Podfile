@@ -11,18 +11,13 @@ project 'Runner', {
 }
 
 def flutter_application_path
-  # Essaye d'abord le chemin standard Flutter/Generated.xcconfig
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
-
-  # Si non trouvé, essaie flutter/Generated.xcconfig (ton cas)
   unless File.exist?(generated_xcode_build_settings_path)
     generated_xcode_build_settings_path = File.expand_path(File.join('..', 'flutter', 'Generated.xcconfig'), __FILE__)
   end
-
   unless File.exist?(generated_xcode_build_settings_path)
     raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first."
   end
-
   File.foreach(generated_xcode_build_settings_path) do |line|
     match = line.match(/FLUTTER_APPLICATION_PATH=(.*)/)
     if match && match[1]
@@ -32,7 +27,8 @@ def flutter_application_path
   raise "FLUTTER_APPLICATION_PATH not found in #{generated_xcode_build_settings_path}. Try running flutter pub get"
 end
 
-require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_application_path)
+# Chemin corrigé pour podhelper (relatif depuis ios/Podfile)
+require_relative '../.ios/Flutter/engine/packages/flutter_tools/bin/podhelper'
 flutter_ios_podfile_setup
 
 target 'Runner' do
