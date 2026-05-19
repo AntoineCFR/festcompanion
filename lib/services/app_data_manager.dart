@@ -177,14 +177,6 @@ class AppDataManager {
     }
   }
 
-  // Méthode d'initialisation (pour compatibilité)
-  Future<void> init(int userId) async {
-    await loadTimetable();
-    await loadFavorites(userId);
-    _selectedDay = await LocalStorageService().getSelectedDay();
-    _showFavoritesOnly = await LocalStorageService().getShowFavoritesOnly();
-  }
-
   // Met à jour la photo d'un utilisateur
   void updateUserPhoto(int userId, String? photoUrl) {
     final index = _users.indexWhere((u) => u.id == userId);
@@ -258,8 +250,8 @@ class AppDataManager {
     }
   }
 
-  // Met à jour la notation
   Future<void> rateFavorite(int setId, int? notation) async {
+    // ✅ 1. Met à jour _userFavorites ET _allUserFavorites IMMEDIATEMENT
     if (!_userFavorites.containsKey(setId)) {
       _userFavorites[setId] = UserFavorite(
         setId: setId,
@@ -270,15 +262,18 @@ class AppDataManager {
       _userFavorites[setId] = _userFavorites[setId]!.copyWith(notation: notation);
     }
 
+    // ✅ 2. Met à jour _allUserFavorites AVANT les await (pour que _loadRatings() voie la nouvelle note)
+    if (_userId != null && _allUserFavorites.containsKey(_userId)) {
+      _allUserFavorites[_userId]![setId] = _userFavorites[setId]!;
+    }
+
+    // 3. Sauvegarde en local (async, ne bloque pas l'UI)
     await LocalStorageService().saveUserFavorites(_userFavorites);
 
+    // 4. Appel API en background (async)
     if (_userId != null) {
       try {
         await ApiService.rateUserFavorite(_userId!, setId, notation ?? -1);
-        // ✅ CORRIGÉ : Met à jour _allUserFavorites MÊME SI _allFavoritesLoaded = false
-        if (_allUserFavorites.containsKey(_userId)) {
-          _allUserFavorites[_userId]![setId] = _userFavorites[setId]!;
-        }
       } catch (e) {
         _showErrorMessage('Impossible de synchroniser la notation.');
       }

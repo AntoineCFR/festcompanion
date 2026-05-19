@@ -10,6 +10,7 @@ class TimetableDistrictRow extends StatelessWidget {
   final double totalWidth;
   final DateTime minStartTime;
   final void Function(TimetableItem) onToggleFavorite;
+  final void Function(TimetableItem)? onTap; // ✅ NOUVEAU
 
   const TimetableDistrictRow({
     super.key,
@@ -18,6 +19,7 @@ class TimetableDistrictRow extends StatelessWidget {
     required this.totalWidth,
     required this.minStartTime,
     required this.onToggleFavorite,
+    this.onTap, // ✅ NOUVEAU
   });
 
   @override
@@ -49,6 +51,7 @@ class TimetableDistrictRow extends StatelessWidget {
                   onToggleFavorite: () => onToggleFavorite(item),
                   width: width,
                   height: TimetableConstants.normalTileHeight,
+                  onTap: () => onTap?.call(item), // ✅ NOUVEAU : Passe le callback
                 ),
               );
             }).toList(),

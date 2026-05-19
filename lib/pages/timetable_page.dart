@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
+import '../models/dj_model.dart';
 import '../services/app_data_manager.dart';
 import '../widgets/timetable/timetable_controls.dart';
 import '../widgets/timetable/empty_timetable_state.dart';
@@ -8,6 +9,7 @@ import '../widgets/timetable/vertical_time_lines.dart';
 import '../widgets/timetable/timetable_district_view.dart';
 import '../widgets/timetable/timetable_favorites_view.dart';
 import '../helpers/timetable_helper.dart';
+import 'djprofilepage.dart';
 
 class TimetablePage extends StatefulWidget {
   final String username;
@@ -44,6 +46,30 @@ class _TimetablePageState extends State<TimetablePage> {
   void _toggleFavorite(TimetableItem item) {
     AppDataManager().toggleFavorite(item.setId);
     setState(() => item.isFavorite = AppDataManager().favoriteSetIds.contains(item.setId));
+  }
+
+  // ✅ NOUVEAU : Fonction pour gérer le tap sur une carte DJ
+  Future<void> _onDjCardTap(TimetableItem item) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DJProfilePage(
+          userId: AppDataManager().userId!,
+          setId: item.setId,
+          dj: DJ(
+            name: item.dj,
+            bio: item.bio ?? '',
+            district: item.district,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            spotifyLink: item.spotifyLink,
+            soundcloudLink: item.soundcloudLink,
+            instagramLink: item.instagramLink,
+          ),
+        ),
+      ),
+    );
+    setState(() {}); // ✅ Rafraîchit la page après retour de DJProfilePage
   }
 
   void _onDayChanged(String? newValue) {
@@ -138,12 +164,14 @@ class _TimetablePageState extends State<TimetablePage> {
                                   totalWidth: totalWidth,
                                   minStartTime: minStartTime,
                                   onToggleFavorite: _toggleFavorite,
+                                  onTap: _onDjCardTap, // ✅ NOUVEAU : Passe le callback
                                 )
                               : TimetableDistrictView(
                                   items: displayItems,
                                   totalWidth: totalWidth,
                                   minStartTime: minStartTime,
                                   onToggleFavorite: _toggleFavorite,
+                                  onTap: _onDjCardTap, // ✅ NOUVEAU : Passe le callback
                                 ),
                         ],
                       ),

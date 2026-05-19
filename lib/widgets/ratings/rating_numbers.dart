@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class RatingNumbers extends StatelessWidget {
+class RatingNumbers extends StatefulWidget {
   final int? rating;
   final ValueChanged<int?> onRatingChanged;
   final int maxRating;
@@ -13,18 +13,41 @@ class RatingNumbers extends StatelessWidget {
   });
 
   @override
+  State<RatingNumbers> createState() => _RatingNumbersState();
+}
+
+class _RatingNumbersState extends State<RatingNumbers> {
+  int? _currentRating;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentRating = widget.rating;
+  }
+
+  // ✅ Met à jour si le parent change la note (ex: depuis une autre page)
+  @override
+  void didUpdateWidget(RatingNumbers oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rating != widget.rating) {
+      setState(() => _currentRating = widget.rating);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 4,
       runSpacing: 4,
-      children: List.generate(maxRating + 1, (index) {
+      children: List.generate(widget.maxRating + 1, (index) {
         final value = index;
-        final isSelected = value == rating;
+        final isSelected = value == _currentRating;
 
         return GestureDetector(
           onTap: () {
-            final newRating = value == rating ? null : value;
-            onRatingChanged(newRating);
+            final newRating = value == _currentRating ? null : value;
+            setState(() => _currentRating = newRating); // ✅ Met à jour l'UI IMMEDIATEMENT
+            widget.onRatingChanged(newRating); // Sync avec le parent
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

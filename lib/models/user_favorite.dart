@@ -17,7 +17,7 @@ class UserFavorite {
     return UserFavorite(
       setId: setId ?? this.setId,
       isFavorite: isFavorite ?? this.isFavorite,
-      notation: notation,
+      notation: notation ?? this.notation,
     );
   }
 

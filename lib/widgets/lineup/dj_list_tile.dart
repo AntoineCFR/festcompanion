@@ -3,20 +3,20 @@ import '../../models/timetable_item.dart';
 import '../../widgets/favorite_star.dart';
 import '../ratings/rating_text.dart';
 import '../../utils/utils.dart';
-import '../../pages/djprofilepage.dart';
-import '../../models/dj_model.dart';
 import '../../services/app_data_manager.dart';
 
 class DJListTile extends StatelessWidget {
   final TimetableItem item;
   final bool isFavorite;
   final VoidCallback onToggleFavorite;
+  final VoidCallback? onTap; // ✅ NOUVEAU
 
   const DJListTile({
     super.key,
     required this.item,
     required this.isFavorite,
     required this.onToggleFavorite,
+    this.onTap, // ✅ NOUVEAU
   });
 
   @override
@@ -25,32 +25,12 @@ class DJListTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       color: isFavorite ? const Color(0xFF7851A9) : null,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DJProfilePage(
-                userId: AppDataManager().userId!,
-                setId: item.setId,
-                dj: DJ(
-                  name: item.dj,
-                  bio: item.bio ?? '',
-                  district: item.district,
-                  startTime: item.startTime,
-                  endTime: item.endTime,
-                  spotifyLink: item.spotifyLink,
-                  soundcloudLink: item.soundcloudLink,
-                  instagramLink: item.instagramLink,
-                ),
-              ),
-            ),
-          );
-        },
+        onTap: onTap, // ✅ MODIFIÉ : Utilise le callback passé (ou null)
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
           child: Row(
             children: [
-              // 1️⃣ PHOTO (à gauche) - CORRIGÉ
+              // 1️⃣ PHOTO (à gauche)
               SizedBox(
                 width: 48,
                 height: 48,
@@ -64,9 +44,7 @@ class DJListTile extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(width: 12),
-
               // 2️⃣ INFOS DJ (au centre)
               Expanded(
                 child: Column(
@@ -96,7 +74,6 @@ class DJListTile extends StatelessWidget {
                   ],
                 ),
               ),
-
               // 3️⃣ ÉTOILE + NOTE (à droite)
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,

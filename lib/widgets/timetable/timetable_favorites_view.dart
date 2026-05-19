@@ -9,6 +9,7 @@ class TimetableFavoritesView extends StatelessWidget {
   final double totalWidth;
   final DateTime minStartTime;
   final void Function(TimetableItem) onToggleFavorite;
+  final void Function(TimetableItem)? onTap; // ✅ NOUVEAU
 
   const TimetableFavoritesView({
     super.key,
@@ -16,6 +17,7 @@ class TimetableFavoritesView extends StatelessWidget {
     required this.totalWidth,
     required this.minStartTime,
     required this.onToggleFavorite,
+    this.onTap, // ✅ NOUVEAU
   });
 
   List<List<TimetableItem>> _assignToLines(List<TimetableItem> items) {
@@ -64,6 +66,7 @@ class TimetableFavoritesView extends StatelessWidget {
                   onToggleFavorite: () => onToggleFavorite(item),
                   width: width,
                   height: TimetableConstants.favoriteTileHeight,
+                  onTap: () => onTap?.call(item), // ✅ NOUVEAU : Passe le callback
                 ),
               );
             }).toList(),

@@ -7,6 +7,7 @@ class TimetableDistrictView extends StatelessWidget {
   final double totalWidth;
   final DateTime minStartTime;
   final void Function(TimetableItem) onToggleFavorite;
+  final void Function(TimetableItem)? onTap; // ✅ NOUVEAU
 
   const TimetableDistrictView({
     super.key,
@@ -14,6 +15,7 @@ class TimetableDistrictView extends StatelessWidget {
     required this.totalWidth,
     required this.minStartTime,
     required this.onToggleFavorite,
+    this.onTap, // ✅ NOUVEAU
   });
 
   Map<String, List<TimetableItem>> _groupItemsByDistrict(List<TimetableItem> items) {
@@ -35,6 +37,7 @@ class TimetableDistrictView extends StatelessWidget {
           totalWidth: totalWidth,
           minStartTime: minStartTime,
           onToggleFavorite: onToggleFavorite,
+          onTap: onTap, // ✅ NOUVEAU : Passe le callback
         );
       }).toList(),
     );

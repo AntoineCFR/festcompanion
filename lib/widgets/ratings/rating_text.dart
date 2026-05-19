@@ -30,7 +30,7 @@ class RatingText extends StatelessWidget {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: Text(
-        rating != null ? '$rating/10' : '-',
+        rating != null && rating! >= 0 ? '$rating/10' : '-', // ✅ CORRIGÉ : Affiche "-" si rating = null OU rating < 0
         style: TextStyle(
           fontSize: 12,
           color: isTransparent ? Colors.grey : Colors.black,

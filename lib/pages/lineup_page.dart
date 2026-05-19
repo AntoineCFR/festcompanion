@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
+import '../models/dj_model.dart';
 import '../services/app_data_manager.dart';
 import '../widgets/lineup/lineup_header.dart';
 import '../widgets/lineup/dj_list_tile.dart';
 import '../widgets/lineup/empty_lineup_state.dart';
 import '../helpers/lineup_helper.dart';
+import 'djprofilepage.dart';
 
 class LineupPage extends StatefulWidget {
   final String username;
@@ -43,6 +45,30 @@ class _LineupPageState extends State<LineupPage> {
     setState(() => item.isFavorite = AppDataManager().favoriteSetIds.contains(item.setId));
   }
 
+  // ✅ NOUVEAU : Fonction pour gérer le tap sur une tuile DJ
+  Future<void> _onDjTileTap(TimetableItem item) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DJProfilePage(
+          userId: AppDataManager().userId!,
+          setId: item.setId,
+          dj: DJ(
+            name: item.dj,
+            bio: item.bio ?? '',
+            district: item.district,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            spotifyLink: item.spotifyLink,
+            soundcloudLink: item.soundcloudLink,
+            instagramLink: item.instagramLink,
+          ),
+        ),
+      ),
+    );
+    setState(() {}); // ✅ Rafraîchit la page après retour
+  }
+
   void _onDayChanged(String? newValue) {
     if (newValue != null) {
       AppDataManager().setSelectedDay(newValue);
@@ -68,7 +94,7 @@ class _LineupPageState extends State<LineupPage> {
       timetable: timetable,
       selectedDay: selectedDay,
       showFavoritesOnly: showFavoritesOnly,
-      favoriteSetIds: favoriteSetIds.toList(),  // <-- Conversion Set<int> → List<int>
+      favoriteSetIds: favoriteSetIds.toList(),
     );
 
     return Container(
@@ -95,6 +121,7 @@ class _LineupPageState extends State<LineupPage> {
                                   item: item,
                                   isFavorite: favoriteSetIds.contains(item.setId),
                                   onToggleFavorite: () => _toggleFavorite(item),
+                                  onTap: () => _onDjTileTap(item), // ✅ NOUVEAU
                                 ))
                             .toList(),
                       )
@@ -123,6 +150,7 @@ class _LineupPageState extends State<LineupPage> {
                                         item: item,
                                         isFavorite: favoriteSetIds.contains(item.setId),
                                         onToggleFavorite: () => _toggleFavorite(item),
+                                        onTap: () => _onDjTileTap(item), // ✅ NOUVEAU
                                       ),
                                     ),
                                   ],

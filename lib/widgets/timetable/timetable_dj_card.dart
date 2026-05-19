@@ -14,6 +14,7 @@ class TimetableDjCard extends StatelessWidget {
   final VoidCallback onToggleFavorite;
   final double width;
   final double height;
+  final VoidCallback? onTap; // ✅ NOUVEAU : Callback optionnel pour le parent
 
   const TimetableDjCard({
     super.key,
@@ -22,6 +23,7 @@ class TimetableDjCard extends StatelessWidget {
     required this.onToggleFavorite,
     required this.width,
     required this.height,
+    this.onTap, // ✅ NOUVEAU
   });
 
   @override
@@ -30,7 +32,7 @@ class TimetableDjCard extends StatelessWidget {
       width: width,
       height: height,
       child: GestureDetector(
-        onTap: () {
+        onTap: onTap ?? () { // ✅ MODIFIÉ : Utilise onTap ou le comportement par défaut
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -60,7 +62,7 @@ class TimetableDjCard extends StatelessWidget {
               children: [
                 if (width >= 60)
                   ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: height - 8), // ← Limite la largeur de l'image
+                    constraints: BoxConstraints(maxWidth: height - 8),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4.0),
                       child: Image.asset(
@@ -83,20 +85,20 @@ class TimetableDjCard extends StatelessWidget {
                         item.dj,
                         style: TimetableConstants.djTextStyle,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis, // ← Tronque si trop long
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         '${AppUtils.formatTime(item.startTime)} - ${AppUtils.formatTime(item.endTime)}',
                         style: TimetableConstants.timeTextStyle,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis, // ← Tronque si trop long
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (height == TimetableConstants.favoriteTileHeight)
                         Text(
                           item.district,
                           style: TimetableConstants.districtSubtitleStyle,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis, // ← Tronque si trop long
+                          overflow: TextOverflow.ellipsis,
                         ),
                     ],
                   ),
