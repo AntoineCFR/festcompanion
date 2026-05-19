@@ -1,13 +1,38 @@
 # Uncomment this line to define a global platform for your project
 platform :ios, '14.0'
 
-# The target name is the name of your app's main target (usually "Runner")
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_application_path
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    applications_path = line.match(/FLUTTER_APPLICATION_PATH:(.*)/)[1].strip
+    return applications_path unless applications_path.nil?
+  end
+  raise "FLUTTER_APPLICATION_PATH not found in #{generated_xcode_build_settings_path}. Try running flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_application_path)
+flutter_ios_podfile_setup
+
 target 'Runner' do
   use_frameworks!
   use_modular_headers!
-
-  # Pods for Runner
+  install_all_flutter_pods(flutter_application_path)
 end
 
-# Add this line at the end to use Flutter's CocoaPods integration
-install_all_flutter_pods(GeneratedPluginRegistrant)
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
+end
