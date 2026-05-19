@@ -10,6 +10,7 @@ class TimetableItem {
   final DateTime startTime;
   final DateTime endTime;
   bool isFavorite;
+  int? notation;  // ← NOUVEAU
   final String? bio;
   final String? spotifyLink;
   final String? soundcloudLink;
@@ -25,6 +26,7 @@ class TimetableItem {
     required this.startTime,
     required this.endTime,
     this.isFavorite = false,
+    this.notation,  // ← NOUVEAU
     this.bio,
     this.spotifyLink,
     this.soundcloudLink,
@@ -43,6 +45,7 @@ class TimetableItem {
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
       'is_favorite': isFavorite,
+      'notation': notation,  // ← NOUVEAU
       'bio': bio,
       'spotify_link': spotifyLink,
       'soundcloud_link': soundcloudLink,
@@ -77,6 +80,7 @@ class TimetableItem {
       startTime: parseDateTime(json['start_time'] ?? json['startTime']),
       endTime: parseDateTime(json['end_time'] ?? json['endTime']),
       isFavorite: json['is_favorite'] ?? json['isFavorite'] ?? false,
+      notation: json['notation'] as int?,  // ← NOUVEAU
       bio: json['bio'],
       spotifyLink: json['spotify_link'] ?? json['spotifyLink'],
       soundcloudLink: json['soundcloud_link'] ?? json['soundcloudLink'],

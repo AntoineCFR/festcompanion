@@ -99,9 +99,9 @@ class _SplashScreenState extends State<SplashScreen> {
             );
           }
 
-          // ✅ Charge UNIQUEMENT les données globales (timetable + utilisateurs)
+          // ✅ Charge TOUTES les données (timetable + utilisateurs + TOUS les favoris)
           return FutureBuilder(
-            future: AppDataManager().loadAllData(),  // ✅ Plus de userId
+            future: AppDataManager().loadAllData(),
             builder: (context, dataSnapshot) {
               if (dataSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
@@ -111,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       CircularProgressIndicator(),
                       SizedBox(height: 20),
                       Text(
-                        'Chargement des données globales...',
+                        'Chargement des données...',
                         style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
                     ],
@@ -132,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       const Icon(Icons.error, color: Colors.red, size: 40),
                       const SizedBox(height: 20),
                       Text(
-                        'Impossible de charger les données globales',
+                        'Impossible de charger les données',
                         style: const TextStyle(color: Colors.white, fontSize: 16),
                         textAlign: TextAlign.center,
                       ),
@@ -146,7 +146,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 );
               }
 
-              // ✅ Redirige vers SplashLogin (qui chargera les favoris de l'utilisateur)
+              // ✅ Redirige vers SplashLogin (les favoris sont déjà chargés)
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
                   Navigator.of(context).pushReplacement(

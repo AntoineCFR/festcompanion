@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/timetable_item.dart';
+import '../models/user_favorite.dart'; // ← NOUVEAU
 
 class ApiService {
   static const String _baseUrl = 'https://extremalineup.onrender.com';
@@ -43,50 +44,94 @@ class ApiService {
     }
   }
 
-  // 3. Récupère les favoris avec user_id (corrigé pour lever une exception)
-  static Future<Set<int>> fetchFavorites(int userId) async {
+  // ========== NOUVELLES MÉTHODES POUR LES FAVORIS ==========
+
+  // Récupère les favoris d'un utilisateur (ou tous si userId=null)
+  static Future<dynamic> fetchUserFavorites([int? userId]) async {
     try {
-      final url = Uri.parse('$_baseUrl/favorites?user_id=$userId');
+      final url = userId != null
+          ? Uri.parse('$_baseUrl/api/user-favorites?user_id=$userId')
+          : Uri.parse('$_baseUrl/api/user-favorites');
+
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return Set<int>.from(
-          (data['favorites'] as List).map((fav) => fav['set_id'] as int),
-        );
+        final favoritesList = data['favorites'] as List;
+
+        if (userId != null) {
+          // ✅ Retourne Map<set_id, UserFavorite> pour UN utilisateur
+          return Map<int, UserFavorite>.fromEntries(
+            favoritesList.map((fav) {
+              final uf = UserFavorite.fromJson(fav);
+              return MapEntry(uf.setId, uf);
+            }),
+          );
+        } else {
+          // ✅ Retourne Map<user_id, Map<set_id, UserFavorite>> pour TOUS les utilisateurs
+          final allFavorites = <int, Map<int, UserFavorite>>{};
+          for (final fav in favoritesList) {
+            final userId = fav['user_id'] as int;
+            final setId = fav['set_id'] as int;
+            final uf = UserFavorite.fromJson(fav);
+
+            allFavorites.putIfAbsent(userId, () => {});
+            allFavorites[userId]![setId] = uf;
+          }
+          return allFavorites;
+        }
       } else {
-        throw Exception(
-          'Échec fetchFavorites: Status ${response.statusCode} - Body: ${response.body}',
-        );
+        throw Exception('Échec fetchUserFavorites: Status ${response.statusCode} - Body: ${response.body}');
       }
     } catch (e) {
       throw Exception('Échec du chargement des favoris: $e');
     }
   }
 
-  // 4. Sauvegarde les favoris avec user_id
-  static Future<void> saveFavorites(int userId, Set<int> favorites) async {
+  // Toggle favori pour un set_id
+  static Future<bool> toggleUserFavorite(int userId, int setId) async {
     try {
-      final url = Uri.parse('$_baseUrl/favorites');
+      final url = Uri.parse('$_baseUrl/api/user-favorites/toggle');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'user_id': userId, 'set_id': setId}),
+      );
 
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['isfavorite'] as bool;
+      } else {
+        throw Exception('Échec toggleUserFavorite: Status ${response.statusCode} - Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Échec du toggle favori: $e');
+    }
+  }
+
+  // Met à jour la notation
+  static Future<void> rateUserFavorite(int userId, int setId, int? notation) async {
+    try {
+      final url = Uri.parse('$_baseUrl/api/user-favorites/rate');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'user_id': userId,
-          'favorites': favorites.toList(),
+          'set_id': setId,
+          'notation': notation,
         }),
       );
 
       if (response.statusCode != 200) {
-        throw Exception(
-          'Échec saveFavorites: Status ${response.statusCode} - Body: ${response.body}',
-        );
+        throw Exception('Échec rateUserFavorite: Status ${response.statusCode} - Body: ${response.body}');
       }
     } catch (e) {
-      throw Exception('Échec de la sauvegarde des favoris: $e');
+      throw Exception('Échec de la mise à jour de la notation: $e');
     }
   }
+
+  // ========== ANCIENNES MÉTHODES (À GARDER) ==========
 
   static Future<List<Map<String, dynamic>>> fetchUsers() async {
     try {
@@ -124,7 +169,7 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        return json.decode(response.body); // Retourne la réponse du backend
+        return json.decode(response.body);
       } else {
         throw Exception('Erreur: ${response.body}');
       }
@@ -132,6 +177,7 @@ class ApiService {
       throw Exception('Erreur de connexion: $e');
     }
   }
+
   static Future<Map<String, dynamic>> updateUserLocation(int userId, double lat, double lng) async {
     try {
       final url = Uri.parse('$_baseUrl/users/$userId/location');

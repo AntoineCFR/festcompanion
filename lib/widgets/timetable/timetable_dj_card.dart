@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../models/timetable_item.dart';
 import '../../models/dj_model.dart';
 import '../../widgets/favorite_star.dart';
+import '../ratings/rating_text.dart';
 import '../../utils/utils.dart';
 import '../../pages/djprofilepage.dart';
+import '../../services/app_data_manager.dart';
 import 'timetable_constants.dart';
 
 class TimetableDjCard extends StatelessWidget {
@@ -33,6 +35,8 @@ class TimetableDjCard extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => DJProfilePage(
+                userId: AppDataManager().userId!,
+                setId: item.setId,
                 dj: DJ(
                   name: item.dj,
                   bio: item.bio ?? '',
@@ -55,15 +59,18 @@ class TimetableDjCard extends StatelessWidget {
             child: Row(
               children: [
                 if (width >= 60)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4.0),
-                    child: Image.asset(
-                      AppUtils.getDjImagePath(item.dj),
-                      width: height - 8,
-                      height: height - 8,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.person, color: Colors.white54, size: 20),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: height - 8), // ← Limite la largeur de l'image
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4.0),
+                      child: Image.asset(
+                        AppUtils.getDjImagePath(item.dj),
+                        width: height - 8,
+                        height: height - 8,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.person, color: Colors.white54, size: 20),
+                      ),
                     ),
                   ),
                 if (width >= 60) const SizedBox(width: 8),
@@ -76,27 +83,36 @@ class TimetableDjCard extends StatelessWidget {
                         item.dj,
                         style: TimetableConstants.djTextStyle,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis, // ← Tronque si trop long
                       ),
                       Text(
                         '${AppUtils.formatTime(item.startTime)} - ${AppUtils.formatTime(item.endTime)}',
                         style: TimetableConstants.timeTextStyle,
                         maxLines: 1,
+                        overflow: TextOverflow.ellipsis, // ← Tronque si trop long
                       ),
                       if (height == TimetableConstants.favoriteTileHeight)
                         Text(
                           item.district,
                           style: TimetableConstants.districtSubtitleStyle,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis, // ← Tronque si trop long
                         ),
                     ],
                   ),
                 ),
                 Center(
-                  child: FavoriteStar(
-                    isFavorite: isFavorite,
-                    onPressed: onToggleFavorite,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FavoriteStar(
+                        isFavorite: isFavorite,
+                        onPressed: onToggleFavorite,
+                      ),
+                      RatingText(
+                        rating: AppDataManager().getUserFavorite(item.setId)?.notation,
+                      ),
+                    ],
                   ),
                 ),
               ],

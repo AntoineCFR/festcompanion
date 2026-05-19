@@ -3,39 +3,74 @@ import '../models/dj_model.dart';
 import '../widgets/dj_profile/dj_profile_header.dart';
 import '../widgets/dj_profile/dj_bio.dart';
 import '../widgets/dj_profile/social_media_links.dart';
+import '../widgets/ratings/ratings_section.dart';
 import '../helpers/social_media_helper.dart';
 import '../utils/utils.dart';
+import '../services/app_data_manager.dart';
 
-class DJProfilePage extends StatelessWidget {
+class DJProfilePage extends StatefulWidget { // ← CHANGÉ : StatefulWidget
   final DJ dj;
+  final int userId;
+  final int setId;
 
-  const DJProfilePage({super.key, required this.dj});
+  const DJProfilePage({
+    super.key,
+    required this.dj,
+    required this.userId,
+    required this.setId,
+  });
 
+  @override
+  State<DJProfilePage> createState() => _DJProfilePageState();
+}
+
+class _DJProfilePageState extends State<DJProfilePage> { // ← NOUVEAU
   @override
   Widget build(BuildContext context) {
     final socialMediaItems = buildSocialMediaItems(
-      spotifyLink: dj.spotifyLink,
-      soundcloudLink: dj.soundcloudLink,
-      instagramLink: dj.instagramLink,
+      spotifyLink: widget.dj.spotifyLink,
+      soundcloudLink: widget.dj.soundcloudLink,
+      instagramLink: widget.dj.instagramLink,
     );
+
+    final isFavorite = AppDataManager().favoriteSetIds.contains(widget.setId);
 
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           children: [
             DJProfileHeader(
-              imagePath: AppUtils.getDjImagePath(dj.name),
-              name: dj.name,
-              district: dj.district,
-              startTime: dj.startTime,
-              endTime: dj.endTime,
+              imagePath: AppUtils.getDjImagePath(widget.dj.name),
+              name: widget.dj.name,
+              district: widget.dj.district,
+              startTime: widget.dj.startTime,
+              endTime: widget.dj.endTime,
+              isFavorite: isFavorite,
+              onToggleFavorite: () async {
+                await AppDataManager().toggleFavorite(widget.setId);
+                setState(() {}); // ← NOUVEAU : Rafraîchit l'UI
+              },
             ),
             const SizedBox(height: 16),
-            DJBio(bio: dj.bio.isNotEmpty ? dj.bio : 'Aucune bio disponible.'),
             if (socialMediaItems.isNotEmpty) ...[
-              const SizedBox(height: 24),
               SocialMediaLinks(items: socialMediaItems),
+              const SizedBox(height: 16),
             ],
+            RatingsSection(
+              userId: widget.userId,
+              setId: widget.setId,
+            ),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                'BIO',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 8),
+            DJBio(bio: widget.dj.bio.isNotEmpty ? widget.dj.bio : 'Aucune bio disponible.'),
+            const SizedBox(height: 20),
           ],
         ),
       ),

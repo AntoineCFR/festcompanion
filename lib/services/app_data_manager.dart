@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/timetable_item.dart';
 import '../models/user_model.dart';
+import '../models/user_favorite.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/profile_service.dart';
@@ -17,6 +18,9 @@ class AppDataManager {
     _timetable = [];
     _users = [];
     _photoUrls = {};
+    _userFavorites = {};
+    _allUserFavorites = {};
+    _allFavoritesLoaded = false;
   }
 
   // Données globales (indépendantes de l'utilisateur)
@@ -25,7 +29,9 @@ class AppDataManager {
   Map<int, String?> _photoUrls = {};
 
   // Données utilisateur (dépendent de l'utilisateur connecté)
-  Set<int> _favoriteSetIds = {};
+  Map<int, UserFavorite> _userFavorites = {};
+  Map<int, Map<int, UserFavorite>> _allUserFavorites = {};
+  bool _allFavoritesLoaded = false;
   int? _userId;
   String _selectedDay = 'friday';
   bool _showFavoritesOnly = false;
@@ -63,17 +69,28 @@ class AppDataManager {
   List<User> get users => _users;
   Map<int, String?> get photoUrls => _photoUrls;
 
+  // Getter pour tous les favoris
+  Map<int, Map<int, UserFavorite>> get allUserFavorites => _allUserFavorites;
+
   // Getters pour les données utilisateur
-  Set<int> get favoriteSetIds => _favoriteSetIds;
+  Set<int> get favoriteSetIds => _userFavorites.entries
+      .where((entry) => entry.value.isFavorite)
+      .map((entry) => entry.key)
+      .toSet();
+
   String get selectedDay => _selectedDay;
   bool get showFavoritesOnly => _showFavoritesOnly;
   int? get userId => _userId;
 
-  // ✅ Charge les données GLOBALES (timetable + utilisateurs)
+  // Récupère UserFavorite pour un set_id
+  UserFavorite? getUserFavorite(int setId) => _userFavorites[setId];
+
+  // Charge les données GLOBALES (timetable + utilisateurs + TOUS les favoris)
   Future<void> loadAllData() async {
     try {
       await loadTimetable();
       await loadUsers();
+      await loadAllUserFavorites();
     } catch (e) {
       _showErrorMessage('Erreur lors du chargement des données globales : $e');
       rethrow;
@@ -92,7 +109,7 @@ class AppDataManager {
     }
   }
 
-  // ✅ Charge les utilisateurs (globaux)
+  // Charge les utilisateurs (globaux)
   Future<void> loadUsers() async {
     try {
       _users = (await ApiService.fetchUsers()).map((map) => User.fromMap(map)).toList();
@@ -115,17 +132,47 @@ class AppDataManager {
     }
   }
 
+  // Charge TOUS les favoris de TOUS les utilisateurs
+  Future<void> loadAllUserFavorites() async {
+    if (_allFavoritesLoaded) return;
 
-  // ✅ Charge les favoris (spécifiques à l'utilisateur)
+    try {
+      final allFavorites = await ApiService.fetchUserFavorites();
+      if (allFavorites is Map<int, Map<int, UserFavorite>>) {
+        _allUserFavorites = allFavorites;
+      } else {
+        final favoritesMap = allFavorites as Map<int, UserFavorite>;
+        _allUserFavorites = {};
+        for (final entry in favoritesMap.entries) {
+          final userId = entry.key;
+          final userFav = entry.value;
+          _allUserFavorites.putIfAbsent(userId, () => {});
+          _allUserFavorites[userId]![userFav.setId] = userFav;
+        }
+      }
+      _allFavoritesLoaded = true;
+    } catch (e) {
+      _showErrorMessage('Impossible de charger les favoris des utilisateurs : $e');
+      _allFavoritesLoaded = false;
+    }
+  }
+
+  // Charge les favoris de l'utilisateur connecté
   Future<void> loadFavorites(int userId) async {
     try {
       _userId = userId;
-      final serverFavorites = await ApiService.fetchFavorites(userId);
-      _favoriteSetIds = serverFavorites;
-      await LocalStorageService().saveFavorites(_favoriteSetIds);
+
+      if (_allFavoritesLoaded && _allUserFavorites.containsKey(userId)) {
+        _userFavorites = _allUserFavorites[userId]!;
+      } else {
+        final serverFavorites = await ApiService.fetchUserFavorites(userId) as Map<int, UserFavorite>;
+        _userFavorites = serverFavorites;
+      }
+
+      await LocalStorageService().saveUserFavorites(_userFavorites);
     } catch (e) {
       _showErrorMessage('Impossible de charger les favoris depuis le serveur.');
-      _favoriteSetIds = await LocalStorageService().getFavorites();
+      _userFavorites = await LocalStorageService().getUserFavorites();
       rethrow;
     }
   }
@@ -138,7 +185,7 @@ class AppDataManager {
     _showFavoritesOnly = await LocalStorageService().getShowFavoritesOnly();
   }
 
-  // ✅ Met à jour la photo d'un utilisateur
+  // Met à jour la photo d'un utilisateur
   void updateUserPhoto(int userId, String? photoUrl) {
     final index = _users.indexWhere((u) => u.id == userId);
     if (index != -1) {
@@ -146,7 +193,7 @@ class AppDataManager {
     }
   }
 
-  // ✅ Met à jour la localisation d'un utilisateur
+  // Met à jour la localisation d'un utilisateur
   void updateUserLocation(int userId, double lat, double lng) {
     final index = _users.indexWhere((u) => u.id == userId);
     if (index != -1) {
@@ -154,7 +201,7 @@ class AppDataManager {
     }
   }
 
-  // ✅ Met à jour le téléphone d'un utilisateur
+  // Met à jour le téléphone d'un utilisateur
   void updateUserPhone(int userId, String phoneNumber) {
     final index = _users.indexWhere((u) => u.id == userId);
     if (index != -1) {
@@ -165,7 +212,9 @@ class AppDataManager {
   // Réinitialisation des données
   void reset() {
     _timetable = [];
-    _favoriteSetIds = {};
+    _userFavorites = {};
+    _allUserFavorites = {};
+    _allFavoritesLoaded = false;
     _userId = null;
     _selectedDay = 'friday';
     _showFavoritesOnly = false;
@@ -182,29 +231,79 @@ class AppDataManager {
     LocalStorageService().saveShowFavoritesOnly(value);
   }
 
+  // Toggle favori pour un set_id
   Future<void> toggleFavorite(int setId) async {
-    if (_favoriteSetIds.contains(setId)) {
-      _favoriteSetIds.remove(setId);
-    } else {
-      _favoriteSetIds.add(setId);
-    }
+    final current = _userFavorites[setId];
+    final newIsFavorite = current == null ? true : !current.isFavorite;
 
-    await LocalStorageService().saveFavorites(_favoriteSetIds);
+    _userFavorites[setId] = UserFavorite(
+      setId: setId,
+      isFavorite: newIsFavorite,
+      notation: current?.notation,
+    );
+
+    await LocalStorageService().saveUserFavorites(_userFavorites);
 
     if (_userId != null) {
       try {
-        await ApiService.saveFavorites(_userId!, _favoriteSetIds);
+        final result = await ApiService.toggleUserFavorite(_userId!, setId);
+        _userFavorites[setId] = _userFavorites[setId]!.copyWith(isFavorite: result);
+        // ✅ CORRIGÉ : Met à jour _allUserFavorites MÊME SI _allFavoritesLoaded = false
+        if (_allUserFavorites.containsKey(_userId)) {
+          _allUserFavorites[_userId]![setId] = _userFavorites[setId]!;
+        }
       } catch (e) {
-        _showErrorMessage('Impossible de synchroniser avec le serveur. Les données sont sauvegardées localement.');
+        _showErrorMessage('Impossible de synchroniser avec le serveur.');
       }
     }
   }
 
+  // Met à jour la notation
+  Future<void> rateFavorite(int setId, int? notation) async {
+    if (!_userFavorites.containsKey(setId)) {
+      _userFavorites[setId] = UserFavorite(
+        setId: setId,
+        isFavorite: false,
+        notation: notation,
+      );
+    } else {
+      _userFavorites[setId] = _userFavorites[setId]!.copyWith(notation: notation);
+    }
+
+    await LocalStorageService().saveUserFavorites(_userFavorites);
+
+    if (_userId != null) {
+      try {
+        await ApiService.rateUserFavorite(_userId!, setId, notation ?? -1);
+        // ✅ CORRIGÉ : Met à jour _allUserFavorites MÊME SI _allFavoritesLoaded = false
+        if (_allUserFavorites.containsKey(_userId)) {
+          _allUserFavorites[_userId]![setId] = _userFavorites[setId]!;
+        }
+      } catch (e) {
+        _showErrorMessage('Impossible de synchroniser la notation.');
+      }
+    }
+  }
+
+  // Synchronise tous les favoris
   Future<void> syncFavorites() async {
     if (_userId == null) return;
     try {
-      await ApiService.saveFavorites(_userId!, _favoriteSetIds);
-      await LocalStorageService().saveFavorites(_favoriteSetIds);
+      for (final entry in _userFavorites.entries) {
+        final setId = entry.key;
+        final fav = entry.value;
+        if (fav.isFavorite) {
+          await ApiService.toggleUserFavorite(_userId!, setId);
+        }
+        if (fav.notation != null) {
+          await ApiService.rateUserFavorite(_userId!, setId, fav.notation);
+        }
+      }
+      // ✅ CORRIGÉ : Met à jour _allUserFavorites MÊME SI _allFavoritesLoaded = false
+      if (_allUserFavorites.containsKey(_userId!)) {
+        _allUserFavorites[_userId!] = Map.from(_userFavorites);
+      }
+      await LocalStorageService().saveUserFavorites(_userFavorites);
     } catch (e) {
       _showErrorMessage('Impossible de synchroniser les favoris avec le serveur.');
     }

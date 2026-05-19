@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/utils.dart';
+import '../../widgets/favorite_star.dart'; // ← NOUVEAU
 
 class DJProfileHeader extends StatelessWidget {
   final String imagePath;
@@ -7,6 +8,8 @@ class DJProfileHeader extends StatelessWidget {
   final String? district;
   final DateTime? startTime;
   final DateTime? endTime;
+  final bool isFavorite; // ← NOUVEAU
+  final VoidCallback onToggleFavorite; // ← NOUVEAU
 
   const DJProfileHeader({
     super.key,
@@ -15,6 +18,8 @@ class DJProfileHeader extends StatelessWidget {
     this.district,
     this.startTime,
     this.endTime,
+    required this.isFavorite, // ← NOUVEAU
+    required this.onToggleFavorite, // ← NOUVEAU
   });
 
   @override
@@ -32,8 +37,9 @@ class DJProfileHeader extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
               ),
             ),
+            // Bouton retour (à gauche)
             Positioned(
-              top: 16,
+              top: 32,
               left: 16,
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -42,6 +48,16 @@ class DJProfileHeader extends StatelessWidget {
                   backgroundColor: Colors.black54,
                   padding: const EdgeInsets.all(8),
                 ),
+              ),
+            ),
+            // ✅ Favorite star (à droite, symétrique)
+            Positioned(
+              top: 32,
+              right: 16,
+              child: FavoriteStar(
+                isFavorite: isFavorite,
+                onPressed: onToggleFavorite,
+                size: 32,
               ),
             ),
           ],
@@ -63,12 +79,12 @@ class DJProfileHeader extends StatelessWidget {
                   style: const TextStyle(fontSize: 20),
                   textAlign: TextAlign.center,
                 ),
-                if (startTime != null && endTime != null)
-                  Text(
-                    '${AppUtils.formatTime(startTime!)} - ${AppUtils.formatTime(endTime!)}',
-                    style: const TextStyle(fontSize: 18),
-                    textAlign: TextAlign.center,
-                  ),
+              if (startTime != null && endTime != null)
+                Text(
+                  '${AppUtils.formatTime(startTime!)} - ${AppUtils.formatTime(endTime!)}',
+                  style: const TextStyle(fontSize: 18),
+                  textAlign: TextAlign.center,
+                ),
             ],
           ),
         ),
