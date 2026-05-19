@@ -240,7 +240,6 @@ class AppDataManager {
       try {
         final result = await ApiService.toggleUserFavorite(_userId!, setId);
         _userFavorites[setId] = _userFavorites[setId]!.copyWith(isFavorite: result);
-        // ✅ CORRIGÉ : Met à jour _allUserFavorites MÊME SI _allFavoritesLoaded = false
         if (_allUserFavorites.containsKey(_userId)) {
           _allUserFavorites[_userId]![setId] = _userFavorites[setId]!;
         }
@@ -250,27 +249,36 @@ class AppDataManager {
     }
   }
 
+  // Met à jour la notation
   Future<void> rateFavorite(int setId, int? notation) async {
-    // ✅ 1. Met à jour _userFavorites ET _allUserFavorites IMMEDIATEMENT
+    // ✅ 1. Récupère l'état favori ACTUEL (pour éviter de l'écraser)
+    bool currentIsFavorite = false;
+    if (_allUserFavorites.containsKey(_userId) && _allUserFavorites[_userId]!.containsKey(setId)) {
+      currentIsFavorite = _allUserFavorites[_userId]![setId]!.isFavorite;
+    } else if (_userFavorites.containsKey(setId)) {
+      currentIsFavorite = _userFavorites[setId]!.isFavorite;
+    }
+
+    // ✅ 2. Met à jour _userFavorites avec le bon état favori
     if (!_userFavorites.containsKey(setId)) {
       _userFavorites[setId] = UserFavorite(
         setId: setId,
-        isFavorite: false,
+        isFavorite: currentIsFavorite, // ✅ Conserve l'état favori existant
         notation: notation,
       );
     } else {
       _userFavorites[setId] = _userFavorites[setId]!.copyWith(notation: notation);
     }
 
-    // ✅ 2. Met à jour _allUserFavorites AVANT les await (pour que _loadRatings() voie la nouvelle note)
-    if (_userId != null && _allUserFavorites.containsKey(_userId)) {
-      _allUserFavorites[_userId]![setId] = _userFavorites[setId]!;
+    // ✅ 3. Met à jour _allUserFavorites IMMEDIATEMENT
+    if (_userId != null) {
+      _allUserFavorites.putIfAbsent(_userId!, () => {})[setId] = _userFavorites[setId]!;
     }
 
-    // 3. Sauvegarde en local (async, ne bloque pas l'UI)
+    // 4. Sauvegarde en local
     await LocalStorageService().saveUserFavorites(_userFavorites);
 
-    // 4. Appel API en background (async)
+    // 5. Appel API en background
     if (_userId != null) {
       try {
         await ApiService.rateUserFavorite(_userId!, setId, notation ?? -1);
@@ -294,7 +302,6 @@ class AppDataManager {
           await ApiService.rateUserFavorite(_userId!, setId, fav.notation);
         }
       }
-      // ✅ CORRIGÉ : Met à jour _allUserFavorites MÊME SI _allFavoritesLoaded = false
       if (_allUserFavorites.containsKey(_userId!)) {
         _allUserFavorites[_userId!] = Map.from(_userFavorites);
       }

@@ -8,7 +8,7 @@ import '../helpers/social_media_helper.dart';
 import '../utils/utils.dart';
 import '../services/app_data_manager.dart';
 
-class DJProfilePage extends StatefulWidget { // ← CHANGÉ : StatefulWidget
+class DJProfilePage extends StatefulWidget {
   final DJ dj;
   final int userId;
   final int setId;
@@ -24,7 +24,7 @@ class DJProfilePage extends StatefulWidget { // ← CHANGÉ : StatefulWidget
   State<DJProfilePage> createState() => _DJProfilePageState();
 }
 
-class _DJProfilePageState extends State<DJProfilePage> { // ← NOUVEAU
+class _DJProfilePageState extends State<DJProfilePage> {
   @override
   Widget build(BuildContext context) {
     final socialMediaItems = buildSocialMediaItems(
@@ -48,7 +48,7 @@ class _DJProfilePageState extends State<DJProfilePage> { // ← NOUVEAU
               isFavorite: isFavorite,
               onToggleFavorite: () async {
                 await AppDataManager().toggleFavorite(widget.setId);
-                setState(() {}); // ← NOUVEAU : Rafraîchit l'UI
+                setState(() {});
               },
             ),
             const SizedBox(height: 16),
@@ -59,6 +59,7 @@ class _DJProfilePageState extends State<DJProfilePage> { // ← NOUVEAU
             RatingsSection(
               userId: widget.userId,
               setId: widget.setId,
+              onRatingChanged: () => setState(() {}), // ✅ NOUVEAU : Rafraîchit l'UI après notation
             ),
             const SizedBox(height: 16),
             const Padding(

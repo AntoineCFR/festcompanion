@@ -7,11 +7,13 @@ import 'rating_legend.dart';
 class RatingsSection extends StatefulWidget {
   final int userId;
   final int setId;
+  final VoidCallback? onRatingChanged; // ✅ NOUVEAU : Callback pour notifier le parent
 
   const RatingsSection({
     super.key,
     required this.userId,
     required this.setId,
+    this.onRatingChanged, // ✅ NOUVEAU
   });
 
   @override
@@ -54,7 +56,6 @@ class _RatingsSectionState extends State<RatingsSection> {
 
   @override
   Widget build(BuildContext context) {
-    // Trouver la note de l'utilisateur connecté
     final currentUser = AppDataManager().users.firstWhere(
       (u) => u.id == widget.userId,
       orElse: () => User(id: widget.userId, username: 'Toi'),
@@ -63,7 +64,6 @@ class _RatingsSectionState extends State<RatingsSection> {
         .firstWhere((entry) => entry.key == widget.userId, orElse: () => MapEntry(widget.userId, null))
         .value;
 
-    // Filtrer et trier les autres utilisateurs avec note
     final otherUsersWithRatings = _ratings
         .where((entry) => entry.key != widget.userId && entry.value != null)
         .toList()
@@ -89,7 +89,6 @@ class _RatingsSectionState extends State<RatingsSection> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1️⃣ Widget pour l'utilisateur connecté (TOUJOURS en premier)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
@@ -100,14 +99,23 @@ class _RatingsSectionState extends State<RatingsSection> {
                     RatingNumbers(
                       rating: currentUserRating,
                       onRatingChanged: (newRating) async {
+                        // ✅ Met à jour l'UI localement immédiatement
+                        setState(() {
+                          final index = _ratings.indexWhere((entry) => entry.key == widget.userId);
+                          if (index != -1) {
+                            _ratings[index] = MapEntry(widget.userId, newRating);
+                          } else {
+                            _ratings.add(MapEntry(widget.userId, newRating));
+                          }
+                        });
                         await AppDataManager().rateFavorite(widget.setId, newRating ?? -1);
                         _loadRatings();
+                        widget.onRatingChanged?.call(); // ✅ NOUVEAU : Notifie DJProfilePage
                       },
                     ),
                   ],
                 ),
               ),
-              // 2️⃣ Autres utilisateurs avec note (triés par nom)
               ...otherUsersWithRatings.map((entry) {
                 final userId = entry.key;
                 final notation = entry.value!;
