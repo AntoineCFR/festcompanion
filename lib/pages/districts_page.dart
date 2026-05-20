@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/district_model.dart';
 import '../models/user_model.dart';
 import '../services/app_data_manager.dart';
-import '../services/location_service.dart';
+import '../helpers/location_helper.dart';
 import '../widgets/districts/district_card.dart';
 
 class DistrictsPage extends StatefulWidget {
@@ -47,7 +46,7 @@ class _DistrictsPageState extends State<DistrictsPage> {
       final users = AppDataManager().users;
       final user = users.firstWhere(
         (u) => u.id == widget.userId,
-        orElse: () => User(id: -1, username: '', userRole: 'user'), // Retourne un User par défaut
+        orElse: () => User(id: -1, username: '', userRole: 'user'),
       );
       if (mounted) {
         setState(() {
@@ -66,14 +65,18 @@ class _DistrictsPageState extends State<DistrictsPage> {
   bool get _isAdmin => _userRole == 'admin';
 
   Future<void> _setCoordinates(String districtName, String corner) async {
+    // Vérifie que le widget est toujours monté AVANT toute opération async
+    if (!mounted) return;
+
     try {
-      final currentLocation = await LocationService.getCurrentLocation();
+      final currentLocation = await LocationHelper.tryGetCurrentPosition();
       if (currentLocation == null) {
-        if (mounted) {
-          AppDataManager().showSnackBar('Impossible de récupérer votre position.');
-        }
+        AppDataManager().showSnackBar('Impossible de récupérer votre position.');
         return;
       }
+
+      // Vérifie à nouveau avant d'ouvrir la dialog
+      if (!mounted) return;
 
       // Demande de confirmation
       final confirm = await showDialog<bool>(
@@ -85,86 +88,81 @@ class _DistrictsPageState extends State<DistrictsPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Annuler'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Confirmer'),
             ),
           ],
         ),
       );
 
-      if (confirm == true && mounted) {
-        final districtIndex = _districts.indexWhere((d) => d.district == districtName);
-        if (districtIndex == -1) return;
+      // Vérifie une dernière fois avant de modifier l'état
+      if (confirm != true || !mounted) return;
 
-        final coordinates = <String, dynamic>{};
-        final district = _districts[districtIndex];
+      final districtIndex = _districts.indexWhere((d) => d.district == districtName);
+      if (districtIndex == -1) return;
 
-        // Met à jour les coordonnées selon le coin
-        switch (corner) {
-          case 'avd':
-            coordinates.addAll({
-              'lat_avd': currentLocation.latitude,
-              'lon_avd': currentLocation.longitude,
-            });
-          case 'avg':
-            coordinates.addAll({
-              'lat_avg': currentLocation.latitude,
-              'lon_avg': currentLocation.longitude,
-            });
-          case 'arg':
-            coordinates.addAll({
-              'lat_arg': currentLocation.latitude,
-              'lon_arg': currentLocation.longitude,
-            });
-          case 'ard':
-            coordinates.addAll({
-              'lat_ard': currentLocation.latitude,
-              'lon_ard': currentLocation.longitude,
-            });
-          case 'rally':
-            coordinates.addAll({
-              'lat_rally_point': currentLocation.latitude,
-              'lon_rally_point': currentLocation.longitude,
-            });
-        }
+      final district = _districts[districtIndex];
+      final coordinates = <String, dynamic>{
+        'lat_avg': district.latAvg,
+        'lon_avg': district.lonAvg,
+        'lat_avd': district.latAvd,
+        'lon_avd': district.lonAvd,
+        'lat_arg': district.latArg,
+        'lon_arg': district.lonArg,
+        'lat_ard': district.latArd,
+        'lon_ard': district.lonArd,
+        'lat_rally_point': district.latRallyPoint,
+        'lon_rally_point': district.lonRallyPoint,
+      };
 
-        // Ajoute les autres coordonnées existantes
-        coordinates.addAll({
-          'lat_avg': district.latAvg,
-          'lon_avg': district.lonAvg,
-          'lat_avd': district.latAvd,
-          'lon_avd': district.lonAvd,
-          'lat_arg': district.latArg,
-          'lon_arg': district.lonArg,
-          'lat_ard': district.latArd,
-          'lon_ard': district.lonArd,
-          'lat_rally_point': district.latRallyPoint,
-          'lon_rally_point': district.lonRallyPoint,
-        });
-
-        await AppDataManager().updateDistrict(districtName, coordinates);
-        if (mounted) {
-          setState(() {
-            _districts[districtIndex] = district.copyWith(
-              latAvg: corner == 'avg' ? currentLocation.latitude : district.latAvg,
-              lonAvg: corner == 'avg' ? currentLocation.longitude : district.lonAvg,
-              latAvd: corner == 'avd' ? currentLocation.latitude : district.latAvd,
-              lonAvd: corner == 'avd' ? currentLocation.longitude : district.lonAvd,
-              latArg: corner == 'arg' ? currentLocation.latitude : district.latArg,
-              lonArg: corner == 'arg' ? currentLocation.longitude : district.lonArg,
-              latArd: corner == 'ard' ? currentLocation.latitude : district.latArd,
-              lonArd: corner == 'ard' ? currentLocation.longitude : district.lonArd,
-              latRallyPoint: corner == 'rally' ? currentLocation.latitude : district.latRallyPoint,
-              lonRallyPoint: corner == 'rally' ? currentLocation.longitude : district.lonRallyPoint,
-            );
-          });
-          AppDataManager().showSnackBar('Coordonnées mises à jour !');
-        }
+      // Met à jour selon le coin
+      switch (corner) {
+        case 'avd':
+          coordinates['lat_avd'] = currentLocation.latitude;
+          coordinates['lon_avd'] = currentLocation.longitude;
+          break;
+        case 'avg':
+          coordinates['lat_avg'] = currentLocation.latitude;
+          coordinates['lon_avg'] = currentLocation.longitude;
+          break;
+        case 'arg':
+          coordinates['lat_arg'] = currentLocation.latitude;
+          coordinates['lon_arg'] = currentLocation.longitude;
+          break;
+        case 'ard':
+          coordinates['lat_ard'] = currentLocation.latitude;
+          coordinates['lon_ard'] = currentLocation.longitude;
+          break;
+        case 'rally':
+          coordinates['lat_rally_point'] = currentLocation.latitude;
+          coordinates['lon_rally_point'] = currentLocation.longitude;
+          break;
       }
+
+      await AppDataManager().updateDistrict(districtName, coordinates);
+
+      // Vérifie une dernière fois avant setState
+      if (!mounted) return;
+
+      setState(() {
+        _districts[districtIndex] = district.copyWith(
+          latAvg: corner == 'avg' ? currentLocation.latitude : district.latAvg,
+          lonAvg: corner == 'avg' ? currentLocation.longitude : district.lonAvg,
+          latAvd: corner == 'avd' ? currentLocation.latitude : district.latAvd,
+          lonAvd: corner == 'avd' ? currentLocation.longitude : district.lonAvd,
+          latArg: corner == 'arg' ? currentLocation.latitude : district.latArg,
+          lonArg: corner == 'arg' ? currentLocation.longitude : district.lonArg,
+          latArd: corner == 'ard' ? currentLocation.latitude : district.latArd,
+          lonArd: corner == 'ard' ? currentLocation.longitude : district.lonArd,
+          latRallyPoint: corner == 'rally' ? currentLocation.latitude : district.latRallyPoint,
+          lonRallyPoint: corner == 'rally' ? currentLocation.longitude : district.lonRallyPoint,
+        );
+      });
+      AppDataManager().showSnackBar('Coordonnées mises à jour !');
     } catch (e) {
       if (mounted) {
         AppDataManager().showSnackBar('Erreur: $e');
@@ -173,13 +171,12 @@ class _DistrictsPageState extends State<DistrictsPage> {
   }
 
   void _openInGoogleMaps(double lat, double lng) async {
-    final url = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      if (mounted) {
-        AppDataManager().showSnackBar('Impossible d\'ouvrir Google Maps.');
-      }
+    final success = await LocationHelper.openInGoogleMaps(
+      latitude: lat,
+      longitude: lng,
+    );
+    if (!success && mounted) {
+      AppDataManager().showSnackBar('Impossible d\'ouvrir Google Maps.');
     }
   }
 
@@ -193,12 +190,12 @@ class _DistrictsPageState extends State<DistrictsPage> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
-            onSelected: (district) {
+            onSelected: (String district) {
               setState(() {
                 _selectedDistrict = district;
               });
             },
-            itemBuilder: (context) => _districts
+            itemBuilder: (BuildContext context) => _districts
                 .map((district) => PopupMenuItem<String>(
                       value: district.district,
                       child: Text(district.district),
@@ -226,7 +223,7 @@ class _DistrictsPageState extends State<DistrictsPage> {
                             child: FilterChip(
                               label: Text(district.district),
                               selected: isSelected,
-                              onSelected: (selected) {
+                              onSelected: (bool selected) {
                                 setState(() {
                                   _selectedDistrict = selected ? district.district : null;
                                 });
@@ -254,9 +251,9 @@ class _DistrictsPageState extends State<DistrictsPage> {
                               onOpenInMaps: _openInGoogleMaps,
                             ),
                           ))
-              ],
+                ],
+              ),
             ),
-          ),
     );
   }
 }

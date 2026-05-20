@@ -1,24 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../helpers/location_helper.dart';
 import '../../extensions/build_context_extensions.dart';
 
 class LocationButton extends StatelessWidget {
   const LocationButton({super.key});
 
   Future<void> _openLocation(BuildContext context) async {
-    final url = Uri.parse('https://www.google.com/maps?q=51.026997,5.443735');
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted){
-          context.showSnackBar('Impossible d\'ouvrir le lien vers Google Maps.');
-        }
-      }
-    } catch (e) {
-      if (context.mounted){
-          context.showSnackBar('Impossible d\'ouvrir le lien vers Google Maps.');
-        }
+    final success = await LocationHelper.openFestivalLocation();
+    if (!success && context.mounted) {
+      context.showSnackBar('Impossible d\'ouvrir Google Maps');
     }
   }
 
