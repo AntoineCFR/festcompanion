@@ -5,6 +5,7 @@ class User {
   final double? lastLat;
   final double? lastLng;
   final String? photoUrl;
+  final String userRole; // NOUVEAU
 
   User({
     required this.id,
@@ -13,6 +14,7 @@ class User {
     this.lastLat,
     this.lastLng,
     this.photoUrl,
+    this.userRole = 'user', // Par défaut: user
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
@@ -23,6 +25,7 @@ class User {
       lastLat: map['last_lat'] != null ? (map['last_lat'] as num).toDouble() : null,
       lastLng: map['last_lng'] != null ? (map['last_lng'] as num).toDouble() : null,
       photoUrl: map['photo_url'],
+      userRole: map['user_role'] as String? ?? 'user', // NOUVEAU
     );
   }
 
@@ -33,6 +36,7 @@ class User {
     double? lastLat,
     double? lastLng,
     String? photoUrl,
+    String? userRole, // NOUVEAU
   }) {
     return User(
       id: id ?? this.id,
@@ -41,6 +45,7 @@ class User {
       lastLat: lastLat ?? this.lastLat,
       lastLng: lastLng ?? this.lastLng,
       photoUrl: photoUrl ?? this.photoUrl,
+      userRole: userRole ?? this.userRole, // NOUVEAU
     );
   }
 
@@ -52,6 +57,7 @@ class User {
       'last_lat': lastLat,
       'last_lng': lastLng,
       'photo_url': photoUrl,
+      'user_role': userRole, // NOUVEAU
     };
   }
 }

@@ -1,7 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/timetable_item.dart';
-import '../models/user_favorite.dart'; // ← NOUVEAU
+import '../models/user_favorite.dart';
+import '../models/district_model.dart';
 
 class LocalStorageService {
   static final LocalStorageService _instance = LocalStorageService._internal();
@@ -75,5 +76,21 @@ class LocalStorageService {
 
   Future<bool> getShowFavoritesOnly() async {
     return _prefs.getBool(_showFavoritesOnlyKey) ?? false;
+  }
+
+  // Sauvegarde les districts
+  Future<void> saveDistricts(List<District> districts) async {
+    final prefs = await SharedPreferences.getInstance();
+    final districtsJson = districts.map((d) => json.encode(d.toJson())).toList();
+    await prefs.setStringList('districts', districtsJson);
+  }
+
+  // Récupère les districts
+  Future<List<District>> getDistricts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final districtsJson = prefs.getStringList('districts') ?? [];
+    return districtsJson
+        .map((jsonStr) => District.fromJson(json.decode(jsonStr)))
+        .toList();
   }
 }

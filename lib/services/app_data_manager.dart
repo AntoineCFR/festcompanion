@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/timetable_item.dart';
 import '../models/user_model.dart';
 import '../models/user_favorite.dart';
+import '../models/district_model.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/profile_service.dart';
@@ -36,6 +37,10 @@ class AppDataManager {
   String _selectedDay = 'friday';
   bool _showFavoritesOnly = false;
   GlobalKey<ScaffoldMessengerState>? _scaffoldMessengerKey;
+
+  // Données districts
+  List<District> _districts = [];
+  bool _isLoadingDistricts = false;
 
   // Setter pour le GlobalKey
   void setScaffoldMessengerKey(GlobalKey<ScaffoldMessengerState> key) {
@@ -81,6 +86,10 @@ class AppDataManager {
   String get selectedDay => _selectedDay;
   bool get showFavoritesOnly => _showFavoritesOnly;
   int? get userId => _userId;
+
+  // Getters pour les districts
+  List<District> get districts => _districts;
+  bool get isLoadingDistricts => _isLoadingDistricts;
 
   // Récupère UserFavorite pour un set_id
   UserFavorite? getUserFavorite(int setId) => _userFavorites[setId];
@@ -308,6 +317,51 @@ class AppDataManager {
       await LocalStorageService().saveUserFavorites(_userFavorites);
     } catch (e) {
       _showErrorMessage('Impossible de synchroniser les favoris avec le serveur.');
+    }
+  }
+
+  // Charge les districts
+  Future<void> loadDistricts() async {
+    if (_districts.isNotEmpty) return;
+
+    _isLoadingDistricts = true;
+    try {
+      _districts = await ApiService.fetchDistricts();
+      await LocalStorageService().saveDistricts(_districts);
+    } catch (e) {
+      _showErrorMessage('Impossible de charger les districts depuis le serveur.');
+      _districts = await LocalStorageService().getDistricts();
+      rethrow;
+    } finally {
+      _isLoadingDistricts = false;
+    }
+  }
+
+  // Met à jour un district
+  Future<void> updateDistrict(String districtName, Map<String, dynamic> coordinates) async {
+    try {
+      final index = _districts.indexWhere((d) => d.district == districtName);
+      if (index != -1) {
+        final updatedDistrict = _districts[index].copyWith(
+          latAvg: coordinates['lat_avg']?.toDouble(),
+          lonAvg: coordinates['lon_avg']?.toDouble(),
+          latAvd: coordinates['lat_avd']?.toDouble(),
+          lonAvd: coordinates['lon_avd']?.toDouble(),
+          latArg: coordinates['lat_arg']?.toDouble(),
+          lonArg: coordinates['lon_arg']?.toDouble(),
+          latArd: coordinates['lat_ard']?.toDouble(),
+          lonArd: coordinates['lon_ard']?.toDouble(),
+          latRallyPoint: coordinates['lat_rally_point']?.toDouble(),
+          lonRallyPoint: coordinates['lon_rally_point']?.toDouble(),
+        );
+        _districts[index] = updatedDistrict;
+      }
+
+      await ApiService.updateDistrict(districtName, coordinates);
+      await LocalStorageService().saveDistricts(_districts);
+    } catch (e) {
+      _showErrorMessage('Impossible de mettre à jour le district.');
+      rethrow;
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../pages/profile_page.dart';
 import '../../pages/team_page.dart';
+import '../../pages/districts_page.dart'; // NOUVEAU
 
 class MainDrawer extends StatelessWidget {
   final String username;
@@ -64,6 +65,26 @@ class MainDrawer extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const TeamPage(),
+                ),
+              );
+            },
+          ),
+          // NOUVEAU: Entrée pour les districts
+          ListTile(
+            leading: const Icon(Icons.location_city, color: Colors.white),
+            title: const Text(
+              'Districts',
+              style: TextStyle(color: Colors.white),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DistrictsPage(
+                    username: username,
+                    userId: userId,
+                  ),
                 ),
               );
             },

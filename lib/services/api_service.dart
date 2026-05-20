@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/timetable_item.dart';
-import '../models/user_favorite.dart'; // ← NOUVEAU
+import '../models/user_favorite.dart';
+import '../models/district_model.dart';
 
 class ApiService {
   static const String _baseUrl = 'https://extremalineup.onrender.com';
@@ -199,4 +200,46 @@ class ApiService {
       throw Exception('Erreur de connexion: $e');
     }
   }
+
+  // Récupère tous les districts
+  static Future<List<District>> fetchDistricts() async {
+    try {
+      final url = Uri.parse('$_baseUrl/api/districts');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => District.fromJson(json)).toList();
+      } else {
+        throw Exception(
+          'Échec fetchDistricts: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec du chargement des districts: $e');
+    }
+  }
+
+  // Met à jour un district
+  static Future<Map<String, dynamic>> updateDistrict(String districtName, Map<String, dynamic> coordinates) async {
+    try {
+      final url = Uri.parse('$_baseUrl/api/districts/$districtName');
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(coordinates),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec updateDistrict: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la mise à jour du district: $e');
+    }
+  }
+
 }
