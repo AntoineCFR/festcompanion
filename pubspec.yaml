@@ -2,7 +2,7 @@ name: festcompanion  # Nom de ton appli (sans espaces, en snake_case)
 description: All you need in one place for your summer festivals!
 
 # Version de l'appli (format : major.minor.patch)
-version: 1.0.1+1
+version: 1.0.2+2
 
 environment:
   sdk: '^3.11.0'  # Version du SDK Dart compatible
@@ -26,6 +26,7 @@ dependencies:
   workmanager: ^0.9.0  # Pour Android
   location: ^8.0.1
   flutter_dotenv: ^6.0.1
+  flutter_local_notifications: ^18.0.0  # Affichage notifications locales (foreground)
 
 dev_dependencies:
   flutter_test:

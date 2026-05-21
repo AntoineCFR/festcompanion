@@ -37,6 +37,12 @@ void main() async {
   // Doit être appelé avant runApp().
   FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
 
+  // Souscrit immédiatement au topic "all_users" — sans attendre le login.
+  // Fait ici car : (1) ne dépend pas de l'utilisateur, (2) doit être actif
+  // même si l'app est fermée, (3) se réessaie à chaque démarrage si ça a
+  // raté la fois précédente.
+  await FirebaseMessaging.instance.subscribeToTopic('all_users');
+
   AppDataManager().setScaffoldMessengerKey(scaffoldMessengerKey);
 
   runApp(const MyApp());
@@ -54,26 +60,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _setupFcmForegroundListener();
-  }
-
-  /// Écoute les messages FCM reçus quand l'app est au premier plan.
-  /// Sur Android, la notification n'est PAS affichée automatiquement par le système
-  /// dans ce cas — on affiche donc une SnackBar.
-  /// Sur iOS, `setForegroundNotificationPresentationOptions` gère l'affichage système.
-  void _setupFcmForegroundListener() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final body = message.notification?.body;
-      if (body != null) {
-        AppDataManager().showSnackBar(body);
-      }
-
-      // Quand quelqu'un se déclare "perdu", le backend met à jour les districts
-      // de tous les utilisateurs → on rafraîchit la liste pour l'afficher à jour.
-      if (message.data['event_type'] == 'perdu') {
-        AppDataManager().loadUsers().ignore();
-      }
-    });
+    // Le listener foreground FCM est géré dans FcmService.init()
+    // (appelé depuis SplashLogin._init() après connexion).
   }
 
   @override

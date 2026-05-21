@@ -1,34 +1,115 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'app_data_manager.dart';
 
-/// Centralise l'initialisation FCM :
-/// demande de permission, abonnement au topic "all_users" (requis pour recevoir
-/// les notifications SOS / perdu / hype envoyées à tous les utilisateurs),
-/// et configuration de l'affichage en avant-plan sur iOS.
+/// Centralise l'initialisation FCM et l'affichage des notifications.
+///
+/// - Demande les permissions système (iOS 13+ / Android 13+)
+/// - Abonne l'appareil au topic "all_users"
+/// - Affiche une notification locale (bannière système) même quand l'app
+///   est au premier plan, via flutter_local_notifications.
+///   Cela garantit un comportement cohérent sur Android ET iOS.
 ///
 /// À appeler une fois par session, après la connexion de l'utilisateur
 /// (ex. depuis SplashLogin._init()).
 class FcmService {
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
   static Future<void> init() async {
     final messaging = FirebaseMessaging.instance;
 
     // Demande la permission d'afficher des notifications.
-    // → Affiche le dialog système sur iOS et Android 13+.
-    // → No-op sur Android ≤ 12 (permission accordée par défaut).
     await messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
 
-    // Abonne l'appareil au topic FCM "all_users".
-    // Le backend envoie SOS / perdu / hype à ce topic → tous les appareils abonnés reçoivent.
-    await messaging.subscribeToTopic('all_users');
+    // ── DEBUG token FCM ───────────────────────────────────────────────────────
+    // Affiche le token dans la console pour tester depuis Firebase Console.
+    // À SUPPRIMER avant la release publique.
+    try {
+      final token = await messaging.getToken();
+      debugPrint('╔══════════════════════════════════════════════════════╗');
+      debugPrint('║  FCM TOKEN (pour test Firebase Console)              ║');
+      debugPrint('║  $token');
+      debugPrint('╚══════════════════════════════════════════════════════╝');
+    } catch (e) {
+      debugPrint('[FCM] Impossible de récupérer le token: $e');
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
-    // iOS : affiche les notifications (bannière + son + badge) même quand l'app est au premier plan.
+    // Note : subscribeToTopic('all_users') est fait dans main() au démarrage,
+    // avant même le login, pour garantir la souscription même app fermée.
+
+    // On désactive l'affichage automatique iOS en foreground car on gère
+    // nous-mêmes l'affichage via flutter_local_notifications (Android + iOS).
     await messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
+      alert: false,
+      badge: false,
+      sound: false,
+    );
+
+    // Initialise le plugin de notifications locales.
+    await _initLocalNotifications();
+
+    // Écoute les messages FCM reçus quand l'app est au premier plan.
+    FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+  }
+
+  static Future<void> _initLocalNotifications() async {
+    // Android : utilise l'icône du launcher comme icône de notification.
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    // iOS : pas de configuration spéciale à l'init — les options sont
+    // passées à chaque show() via DarwinNotificationDetails.
+    const iosSettings = DarwinInitializationSettings();
+
+    await _localNotifications.initialize(
+      const InitializationSettings(android: androidSettings, iOS: iosSettings),
+    );
+  }
+
+  static Future<void> _onForegroundMessage(RemoteMessage message) async {
+    final eventType = message.data['event_type'] ?? '';
+
+    // ── Logique métier ────────────────────────────────────────────────────────
+    // Quand quelqu'un se déclare "perdu", le backend met à jour les districts
+    // → on rafraîchit la liste des utilisateurs pour l'afficher à jour.
+    if (eventType == 'perdu') {
+      AppDataManager().loadUsers().ignore();
+    }
+
+    // ── Affichage notification locale ─────────────────────────────────────────
+    // Visible même app au premier plan, sur Android et iOS.
+    final title = message.notification?.title ?? '';
+    final body = message.notification?.body ?? '';
+    if (title.isEmpty && body.isEmpty) return;
+
+    final isSos = eventType == 'sos';
+
+    await _localNotifications.show(
+      // ID unique basé sur le hash du message (évite les doublons).
+      message.hashCode,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          // Réutilise les channels déjà créés dans MainActivity.kt.
+          isSos ? 'sos_channel' : 'festival_channel',
+          isSos ? 'SOS & Urgences' : 'Événements Festival',
+          importance: isSos ? Importance.high : Importance.defaultImportance,
+          priority: isSos ? Priority.high : Priority.defaultPriority,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
     );
   }
 }
