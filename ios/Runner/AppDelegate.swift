@@ -1,6 +1,5 @@
 import Flutter
 import UIKit
-import workmanager
 import UserNotifications
 
 @main
@@ -17,17 +16,10 @@ import UserNotifications
     // via FcmService.init() → FirebaseMessaging.requestPermission().
     application.registerForRemoteNotifications()
 
-    // ── WorkManager ────────────────────────────────────────────────────────────
-    WorkManagerPlugin.setPluginRegistrantCallback { registry in
-      GeneratedPluginRegistrant.register(with: registry)
-    }
-    WorkManagerPlugin.setConstraints(
-      requiresNetworkType: .connected,
-      requiresBatteryNotLow: true,
-      requiresStorageNotLow: true,
-      requiresCharging: false,
-      requiresDeviceIdle: false
-    )
+    // Note : WorkManager (background geoloc) n'est pas configuré sur iOS car
+    // le plugin workmanager_apple ne supporte pas encore SPM (Swift Package Manager).
+    // Le background geoloc fonctionne sur Android via WorkManager.
+    // Sur iOS, seule la mise à jour manuelle (bouton rafraîchir) est disponible.
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -39,8 +31,6 @@ import UserNotifications
   // ── Affichage des notifications en avant-plan (iOS) ────────────────────────
   // Quand l'app est ouverte et qu'une notification arrive, iOS l'affiche
   // normalement en silence. Cette méthode force l'affichage en bannière + son.
-  // Note : firebase_messaging définit lui-même le delegate via method swizzling ;
-  // `super` transmet l'appel au plugin.
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     willPresent notification: UNNotification,
