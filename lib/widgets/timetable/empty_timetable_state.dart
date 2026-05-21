@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import '../../services/app_data_manager.dart';
 import 'timetable_controls.dart';
 
 class EmptyTimetableState extends StatelessWidget {
   final List<String> days;
   final String selectedDay;
-  final bool showFavoritesOnly;
+  final FavoriteFilterMode filterMode;
   final void Function(String?) onDayChanged;
-  final void Function(bool) onShowFavoritesOnlyChanged;
+  final void Function(FavoriteFilterMode) onFilterModeChanged;
 
   const EmptyTimetableState({
     super.key,
     required this.days,
     required this.selectedDay,
-    required this.showFavoritesOnly,
+    required this.filterMode,
     required this.onDayChanged,
-    required this.onShowFavoritesOnlyChanged,
+    required this.onFilterModeChanged,
   });
 
   @override
@@ -24,9 +25,9 @@ class EmptyTimetableState extends StatelessWidget {
         TimetableControls(
           selectedDay: selectedDay,
           days: days,
-          showFavoritesOnly: showFavoritesOnly,
+          filterMode: filterMode,
           onDayChanged: onDayChanged,
-          onShowFavoritesOnlyChanged: onShowFavoritesOnlyChanged,
+          onFilterModeChanged: onFilterModeChanged,
         ),
         const Expanded(child: Center(child: Text('Aucun DJ à afficher.'))),
       ],

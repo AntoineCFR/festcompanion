@@ -22,20 +22,24 @@ class ProfileHelper {
     );
   }
 
-  // Rafraîchissement de la localisation
+  // Rafraîchissement de la localisation + district
   static Future<void> refreshLocation(int userId) async {
     final position = await LocationHelper.getCurrentPosition();
 
-    // Met à jour l'API et le modèle local
-    await ApiService.updateUserLocation(
-      userId,
-      position.latitude,
-      position.longitude,
+    // Envoie au backend avec des paramètres NOMMÉS
+    final response = await ApiService.updateGeoloc(
+      userId: userId,
+      lat: position.latitude,
+      lng: position.longitude,
     );
+
+    // Met à jour le modèle local avec le district
+    final district = response['district'] as String?;
     AppDataManager().updateUserLocation(
       userId,
       position.latitude,
       position.longitude,
+      district: district,
     );
   }
 

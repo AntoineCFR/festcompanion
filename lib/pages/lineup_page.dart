@@ -45,7 +45,6 @@ class _LineupPageState extends State<LineupPage> {
     setState(() => item.isFavorite = AppDataManager().favoriteSetIds.contains(item.setId));
   }
 
-  // ✅ NOUVEAU : Fonction pour gérer le tap sur une tuile DJ
   Future<void> _onDjTileTap(TimetableItem item) async {
     await Navigator.push(
       context,
@@ -66,7 +65,7 @@ class _LineupPageState extends State<LineupPage> {
         ),
       ),
     );
-    setState(() {}); // ✅ Rafraîchit la page après retour
+    setState(() {});
   }
 
   void _onDayChanged(String? newValue) {
@@ -77,24 +76,28 @@ class _LineupPageState extends State<LineupPage> {
     }
   }
 
-  void _onShowFavoritesOnlyChanged(bool value) {
-    AppDataManager().setShowFavoritesOnly(value);
+  void _onFilterModeChanged(FavoriteFilterMode mode) {
+    AppDataManager().setFilterMode(mode);
     setState(() {});
     _scrollToTop();
   }
 
   @override
   Widget build(BuildContext context) {
+    final filterMode = AppDataManager().filterMode;
     final selectedDay = AppDataManager().selectedDay;
-    final showFavoritesOnly = AppDataManager().showFavoritesOnly;
     final favoriteSetIds = AppDataManager().favoriteSetIds;
+    final allFavoriteSetIds = AppDataManager().allUsersFavoriteSetIds;
     final timetable = AppDataManager().timetable;
+    final isFiltered = filterMode != FavoriteFilterMode.normal;
 
     final displayItems = LineupHelper.filterAndSortTimetable(
       timetable: timetable,
       selectedDay: selectedDay,
-      showFavoritesOnly: showFavoritesOnly,
+      showFavoritesOnly: filterMode == FavoriteFilterMode.myFavorites,
       favoriteSetIds: favoriteSetIds.toList(),
+      showAllUsersFavorites: filterMode == FavoriteFilterMode.teamFavorites,
+      allFavoriteSetIds: allFavoriteSetIds.toList(),
     );
 
     return Container(
@@ -104,59 +107,61 @@ class _LineupPageState extends State<LineupPage> {
           LineupHeader(
             selectedDay: selectedDay,
             days: _days,
-            showFavoritesOnly: showFavoritesOnly,
+            filterMode: filterMode,
             onDayChanged: _onDayChanged,
-            onShowFavoritesOnlyChanged: _onShowFavoritesOnlyChanged,
+            onFilterModeChanged: _onFilterModeChanged,
           ),
           Expanded(
             child: ListView(
               controller: _scrollController,
               children: [
-                if (displayItems.isEmpty)
-                  const EmptyLineupState(),
-                showFavoritesOnly
-                    ? Column(
-                        children: displayItems
-                            .map((item) => DJListTile(
-                                  item: item,
-                                  isFavorite: favoriteSetIds.contains(item.setId),
-                                  onToggleFavorite: () => _toggleFavorite(item),
-                                  onTap: () => _onDjTileTap(item), // ✅ NOUVEAU
-                                ))
-                            .toList(),
-                      )
-                    : Column(
-                        children: LineupHelper.groupByDistrict(displayItems)
-                            .entries
-                            .map((districtEntry) => Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
-                                      child: Text(
-                                        districtEntry.key,
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                      ),
+                if (displayItems.isEmpty) const EmptyLineupState(),
+                // Mode filtré (mes favoris OU équipe) : liste plate triée par heure
+                if (isFiltered)
+                  Column(
+                    children: displayItems
+                        .map((item) => DJListTile(
+                              item: item,
+                              isFavorite: favoriteSetIds.contains(item.setId),
+                              onToggleFavorite: () => _toggleFavorite(item),
+                              onTap: () => _onDjTileTap(item),
+                            ))
+                        .toList(),
+                  )
+                else
+                  // Mode normal : regroupé par district
+                  Column(
+                    children: LineupHelper.groupByDistrict(displayItems)
+                        .entries
+                        .map((districtEntry) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  child: Text(
+                                    districtEntry.key,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
                                     ),
-                                    ...districtEntry.value.map(
-                                      (item) => DJListTile(
-                                        item: item,
-                                        isFavorite: favoriteSetIds.contains(item.setId),
-                                        onToggleFavorite: () => _toggleFavorite(item),
-                                        onTap: () => _onDjTileTap(item), // ✅ NOUVEAU
-                                      ),
-                                    ),
-                                  ],
-                                ))
-                            .toList(),
-                      ),
+                                  ),
+                                ),
+                                ...districtEntry.value.map(
+                                  (item) => DJListTile(
+                                    item: item,
+                                    isFavorite: favoriteSetIds.contains(item.setId),
+                                    onToggleFavorite: () => _toggleFavorite(item),
+                                    onTap: () => _onDjTileTap(item),
+                                  ),
+                                ),
+                              ],
+                            ))
+                        .toList(),
+                  ),
               ],
             ),
           ),

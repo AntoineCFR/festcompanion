@@ -15,19 +15,17 @@ class MainBottomNavBar extends StatelessWidget {
     return BottomNavigationBar(
       currentIndex: currentIndex,
       onTap: onTap,
+      type: BottomNavigationBarType.fixed,
+      backgroundColor: Colors.grey[900],
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Colors.white38,
+      selectedFontSize: 12,
+      unselectedFontSize: 11,
       items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: 'Accueil',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.queue_music),
-          label: 'Line-up',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.schedule),
-          label: 'Timetable',
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
+        BottomNavigationBarItem(icon: Icon(Icons.whatshot), label: 'Events'),
+        BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Line-up'),
+        BottomNavigationBarItem(icon: Icon(Icons.schedule), label: 'Timetable'),
       ],
     );
   }

@@ -11,7 +11,7 @@ class ApiService {
   static Future<List<TimetableItem>> fetchTimetable() async {
     try {
       final url = Uri.parse('$_baseUrl/timetable');
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -30,7 +30,7 @@ class ApiService {
   static Future<int?> checkUserExists(String username) async {
     try {
       final url = Uri.parse('$_baseUrl/users/check?username=$username');
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -54,14 +54,14 @@ class ApiService {
           ? Uri.parse('$_baseUrl/api/user-favorites?user_id=$userId')
           : Uri.parse('$_baseUrl/api/user-favorites');
 
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final favoritesList = data['favorites'] as List;
 
         if (userId != null) {
-          // ✅ Retourne Map<set_id, UserFavorite> pour UN utilisateur
+          // Retourne Map<set_id, UserFavorite> pour UN utilisateur
           return Map<int, UserFavorite>.fromEntries(
             favoritesList.map((fav) {
               final uf = UserFavorite.fromJson(fav);
@@ -69,7 +69,7 @@ class ApiService {
             }),
           );
         } else {
-          // ✅ Retourne Map<user_id, Map<set_id, UserFavorite>> pour TOUS les utilisateurs
+          // Retourne Map<user_id, Map<set_id, UserFavorite>> pour TOUS les utilisateurs
           final allFavorites = <int, Map<int, UserFavorite>>{};
           for (final fav in favoritesList) {
             final userId = fav['user_id'] as int;
@@ -137,7 +137,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> fetchUsers() async {
     try {
       final url = Uri.parse('$_baseUrl/users');
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -147,6 +147,8 @@ class ApiService {
           'phone_number': user['phone_number']?.toString() ?? '',
           'last_lat': user['last_lat'] ?? 0.0,
           'last_lng': user['last_lng'] ?? 0.0,
+          'last_location': user['last_location'] ?? '?',
+          'user_role': user['user_role'] ?? 'user',
         }).toList();
       } else {
         throw Exception(
@@ -205,7 +207,7 @@ class ApiService {
   static Future<List<District>> fetchDistricts() async {
     try {
       final url = Uri.parse('$_baseUrl/api/districts');
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -242,4 +244,104 @@ class ApiService {
     }
   }
 
+  // ========== NOUVELLES MÉTHODES POUR LA GÉOLOC ==========
+
+  // Met à jour la géolocalisation (avec district)
+  static Future<Map<String, dynamic>> updateGeoloc({
+    required int userId,
+    required double lat,
+    required double lng,
+    String? district,
+  }) async {
+    try {
+      final url = Uri.parse('$_baseUrl/api/geoloc');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': userId,
+          'lat': lat,
+          'lng': lng,
+          'district': district,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec updateGeoloc: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la mise à jour de la géolocalisation: $e');
+    }
+  }
+
+  // ========== NOUVELLES MÉTHODES POUR LES ÉVÉNEMENTS ==========
+
+  // Récupère les événements d'un utilisateur
+  static Future<List<dynamic>> fetchUserEvents(int userId) async {
+    try {
+      final url = Uri.parse('$_baseUrl/api/events?user_id=$userId');
+      final response = await http.get(url).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        return List<dynamic>.from(json.decode(response.body));
+      } else {
+        throw Exception(
+          'Échec fetchUserEvents: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec du chargement des événements: $e');
+    }
+  }
+
+  // Crée un nouvel événement
+  static Future<dynamic> createEvent({
+    required int userId,
+    required String eventType,
+  }) async {
+    try {
+      final url = Uri.parse('$_baseUrl/api/events');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': userId,
+          'event_type': eventType,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec createEvent: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la création de l\'événement: $e');
+    }
+  }
+
+  // Supprime le dernier événement d'un utilisateur
+  static Future<void> deleteLastEvent(int userId) async {
+    try {
+      final url = Uri.parse('$_baseUrl/api/events/last?user_id=$userId');
+      final response = await http.delete(url).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Échec deleteLastEvent: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la suppression de l\'événement: $e');
+    }
+  }
+
+  // Note : la mise à jour des districts de tous les utilisateurs (event "perdu")
+  // est gérée directement côté backend dans POST /api/events — aucun appel séparé nécessaire.
 }

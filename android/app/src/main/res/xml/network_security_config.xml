@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- ✅ Autorise toutes les connexions HTTPS (pour le développement) -->
-    <base-config cleartextTrafficPermitted="false">  <!-- ✅ Désactive le HTTP (sécurité) -->
+    <!-- N'autorise que les CA système (pas les certificats installés par l'utilisateur).
+         Empêche les attaques MITM via un certificat proxy (Charles, mitmproxy, etc.). -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 

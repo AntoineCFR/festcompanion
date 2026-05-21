@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
 import 'home_page.dart';
+import 'events_page.dart';
 import 'lineup_page.dart';
 import 'timetable_page.dart';
 import '../widgets/main/main_drawer.dart';
@@ -67,6 +68,7 @@ class _MainScreenState extends State<MainScreen> {
         },
         children: [
           HomePage(username: widget.username, userId: widget.userId),
+          EventsPage(username: widget.username, userId: widget.userId),
           LineupPage(username: widget.username, userId: widget.userId),
           TimetablePage(username: widget.username, userId: widget.userId),
         ],

@@ -12,7 +12,7 @@ class WeatherService {
   Future<List<WeatherForecast>?> getWeatherForecast() async {
     try {
       // 1. Essaye de récupérer depuis le serveur
-      final response = await http.get(Uri.parse(_weatherUrl));
+      final response = await http.get(Uri.parse(_weatherUrl)).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);

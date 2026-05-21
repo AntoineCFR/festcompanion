@@ -5,13 +5,16 @@ import 'user_card.dart';
 class TeamList extends StatelessWidget {
   final List<User> users;
   final void Function(String) onCallPressed;
-  final void Function(double?, double?) onLocatePressed;  // <-- Typage mis à jour
+  final void Function(double?, double?) onLocatePressed;
+  /// Appelé quand l'utilisateur tape sur une carte (navigation vers le profil).
+  final void Function(User)? onTap;
 
   const TeamList({
     super.key,
     required this.users,
     required this.onCallPressed,
     required this.onLocatePressed,
+    this.onTap,
   });
 
   @override
@@ -23,12 +26,12 @@ class TeamList extends StatelessWidget {
     return ListView.builder(
       itemCount: users.length,
       itemBuilder: (context, index) {
-        final user = users[index];  // user est déjà un User
-
+        final user = users[index];
         return UserCard(
-          user: user,  // <-- Passe directement l'objet User
+          user: user,
           onCallPressed: onCallPressed,
           onLocatePressed: onLocatePressed,
+          onTap: onTap != null ? () => onTap!(user) : null,
         );
       },
     );

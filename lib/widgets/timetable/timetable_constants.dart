@@ -5,6 +5,10 @@ class TimetableConstants {
   static const double pixelsPerHour = pixelsPerMinute * 60;
   static const double normalTileHeight = 63.0;
   static const double favoriteTileHeight = 80.0;
+  /// Hauteur supplémentaire quand la ligne d'avatars fans est visible.
+  static const double fanRowHeight = 26.0;
+  /// Largeur fixe de la photo DJ dans la tuile (indépendante de la hauteur).
+  static const double photoWidth = 48.0;
   static const double timeScaleHeight = 40.0;
   static const double districtSpacing = 2.0;
   static const EdgeInsets cardMargin = EdgeInsets.symmetric(vertical: 5, horizontal: 2);

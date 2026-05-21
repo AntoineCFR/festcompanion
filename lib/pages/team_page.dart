@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import '../models/user_model.dart';
 import '../services/app_data_manager.dart';
-import '../widgets/team/team_app_bar.dart';
-import '../widgets/team/team_list.dart';
 import '../helpers/team_helper.dart';
+import '../widgets/team/team_list.dart';
+import 'user_profile_page.dart';
 
 class TeamPage extends StatefulWidget {
   const TeamPage({super.key});
@@ -12,30 +13,54 @@ class TeamPage extends StatefulWidget {
 }
 
 class _TeamPageState extends State<TeamPage> {
-  final appData = AppDataManager();
+  bool _isLoading = true;
 
-  Future<void> _refreshUsers() async {
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
     try {
-      await appData.loadUsers();
+      await AppDataManager().loadUsers();
     } catch (e) {
-      if (mounted) {
-        AppDataManager().showSnackBar('Erreur : $e');
-      }
+      if (mounted) AppDataManager().showSnackBar('Erreur chargement équipe : $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final users = AppDataManager().users;
+
     return Scaffold(
-      appBar: TeamAppBar(onRefreshPressed: _refreshUsers),
-      body: Container(
-        color: Colors.grey[900],
-        child: TeamList(
-          users: appData.users,
-          onCallPressed: (phoneNumber) => TeamHelper.callUser(phoneNumber),
-          onLocatePressed: (lat, lng) => TeamHelper.locateUser(lat, lng),
-        ),
+      backgroundColor: Colors.grey[900],
+      appBar: AppBar(
+        title: const Text('Équipe'),
+        backgroundColor: Colors.grey[800],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : users.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Aucun membre',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                )
+              : TeamList(
+                  users: users,
+                  onCallPressed: (phone) => TeamHelper.callUser(phone),
+                  onLocatePressed: (lat, lng) => TeamHelper.locateUser(lat, lng),
+                  onTap: (User user) => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => UserProfilePage(user: user),
+                    ),
+                  ),
+                ),
     );
   }
 }

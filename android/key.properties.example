@@ -1,0 +1,10 @@
+# Copier ce fichier en "key.properties" (jamais commité — déjà dans .gitignore)
+# puis renseigner les valeurs de ton keystore de release.
+#
+# Générer un keystore (une seule fois) :
+#   keytool -genkey -v -keystore app/release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release
+#
+storePassword=VOTRE_MOT_DE_PASSE_STORE
+keyPassword=VOTRE_MOT_DE_PASSE_CLE
+keyAlias=release
+storeFile=app/release.jks

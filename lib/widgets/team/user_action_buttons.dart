@@ -18,20 +18,25 @@ class UserActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canCall = phoneNumber?.isNotEmpty == true;
+    final canLocate = latitude != null && longitude != null;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: const Icon(Icons.phone, color: Colors.white),
-          onPressed: (phoneNumber?.isNotEmpty == true)
-              ? () => onCallPressed(phoneNumber!)
-              : null,
+          icon: Icon(Icons.phone, size: 22,
+              color: canCall ? Colors.white : Colors.white24),
+          constraints: const BoxConstraints(),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          onPressed: canCall ? () => onCallPressed(phoneNumber!) : null,
         ),
         IconButton(
-          icon: const Icon(Icons.location_on, color: Colors.white),
-          onPressed: (latitude != null && longitude != null)
-              ? () => onLocatePressed(latitude, longitude)
-              : null,
+          icon: Icon(Icons.near_me, size: 22,
+              color: canLocate ? Colors.white : Colors.white24),
+          constraints: const BoxConstraints(),
+          padding: const EdgeInsets.only(left: 6, right: 0),
+          onPressed: canLocate ? () => onLocatePressed(latitude, longitude) : null,
         ),
       ],
     );

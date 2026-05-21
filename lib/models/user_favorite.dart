@@ -1,3 +1,6 @@
+// Sentinel used by copyWith to distinguish "not provided" from explicit null.
+const _notationUnset = Object();
+
 class UserFavorite {
   final int setId;
   final bool isFavorite;
@@ -9,15 +12,17 @@ class UserFavorite {
     this.notation,
   });
 
+  /// [notation] accepts explicit null to clear the value.
+  /// Omit it entirely to keep the current value.
   UserFavorite copyWith({
     int? setId,
     bool? isFavorite,
-    int? notation,
+    Object? notation = _notationUnset,
   }) {
     return UserFavorite(
       setId: setId ?? this.setId,
       isFavorite: isFavorite ?? this.isFavorite,
-      notation: notation ?? this.notation,
+      notation: identical(notation, _notationUnset) ? this.notation : notation as int?,
     );
   }
 

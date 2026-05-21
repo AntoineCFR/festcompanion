@@ -10,25 +10,34 @@ class UserAvatar extends StatelessWidget {
   const UserAvatar({
     super.key,
     required this.user,
-    this.radius = 20,
+    this.radius = 24,
   });
 
   @override
   Widget build(BuildContext context) {
-    final photoUrl = AppDataManager().photoUrls[user.id];  // ✅ Utilise _photoUrls
+    final photoUrl = AppDataManager().photoUrls[user.id];
     if (photoUrl != null) {
       return CircleAvatar(
         radius: radius,
         backgroundColor: Colors.grey[700],
-        backgroundImage: CachedNetworkImageProvider(
-          '$photoUrl?${DateTime.now().millisecondsSinceEpoch}',
-        ),
+        backgroundImage: CachedNetworkImageProvider(photoUrl),
       );
     }
+    // Fallback : première lettre du prénom
+    final initial = user.username.isNotEmpty
+        ? user.username[0].toUpperCase()
+        : '?';
     return CircleAvatar(
       radius: radius,
-      backgroundColor: Colors.grey[700],
-      child: const Icon(Icons.account_circle, color: Colors.white),
+      backgroundColor: Colors.grey[600],
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: radius * 0.85,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }

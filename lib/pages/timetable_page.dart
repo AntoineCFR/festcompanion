@@ -48,7 +48,6 @@ class _TimetablePageState extends State<TimetablePage> {
     setState(() => item.isFavorite = AppDataManager().favoriteSetIds.contains(item.setId));
   }
 
-  // ✅ NOUVEAU : Fonction pour gérer le tap sur une carte DJ
   Future<void> _onDjCardTap(TimetableItem item) async {
     await Navigator.push(
       context,
@@ -69,7 +68,7 @@ class _TimetablePageState extends State<TimetablePage> {
         ),
       ),
     );
-    setState(() {}); // ✅ Rafraîchit la page après retour de DJProfilePage
+    setState(() {});
   }
 
   void _onDayChanged(String? newValue) {
@@ -80,8 +79,8 @@ class _TimetablePageState extends State<TimetablePage> {
     }
   }
 
-  void _onShowFavoritesOnlyChanged(bool value) {
-    AppDataManager().setShowFavoritesOnly(value);
+  void _onFilterModeChanged(FavoriteFilterMode mode) {
+    AppDataManager().setFilterMode(mode);
     setState(() {});
     _scrollToTop();
   }
@@ -91,13 +90,17 @@ class _TimetablePageState extends State<TimetablePage> {
     final timetable = AppDataManager().timetable;
     TimetableHelper.updateFavoriteStatus(timetable);
 
+    final filterMode = AppDataManager().filterMode;
     final selectedDay = AppDataManager().selectedDay;
-    final showFavoritesOnly = AppDataManager().showFavoritesOnly;
+    final isFiltered = filterMode != FavoriteFilterMode.normal;
+
     final displayItems = TimetableHelper.filterAndSortTimetable(
       timetable: timetable,
       selectedDay: selectedDay,
-      showFavoritesOnly: showFavoritesOnly,
+      showFavoritesOnly: filterMode == FavoriteFilterMode.myFavorites,
       favoriteSetIds: AppDataManager().favoriteSetIds.toList(),
+      showAllUsersFavorites: filterMode == FavoriteFilterMode.teamFavorites,
+      allFavoriteSetIds: AppDataManager().allUsersFavoriteSetIds.toList(),
     );
 
     if (displayItems.isEmpty) {
@@ -106,16 +109,16 @@ class _TimetablePageState extends State<TimetablePage> {
         child: EmptyTimetableState(
           days: _days,
           selectedDay: selectedDay,
-          showFavoritesOnly: showFavoritesOnly,
+          filterMode: filterMode,
           onDayChanged: _onDayChanged,
-          onShowFavoritesOnlyChanged: _onShowFavoritesOnlyChanged,
+          onFilterModeChanged: _onFilterModeChanged,
         ),
       );
     }
 
     final minStartTime = TimetableHelper.getMinStartTime(displayItems);
     final maxEndTime = TimetableHelper.getMaxEndTime(displayItems);
-    final totalWidth = maxEndTime.difference(minStartTime).inMinutes * 3.0; // pixelsPerMinute
+    final totalWidth = maxEndTime.difference(minStartTime).inMinutes * 3.0;
     final offsetInPixels = TimetableHelper.calculateOffset(minStartTime);
 
     return Container(
@@ -125,9 +128,9 @@ class _TimetablePageState extends State<TimetablePage> {
           TimetableControls(
             selectedDay: selectedDay,
             days: _days,
-            showFavoritesOnly: showFavoritesOnly,
+            filterMode: filterMode,
             onDayChanged: _onDayChanged,
-            onShowFavoritesOnlyChanged: _onShowFavoritesOnlyChanged,
+            onFilterModeChanged: _onFilterModeChanged,
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -140,7 +143,7 @@ class _TimetablePageState extends State<TimetablePage> {
                   child: Stack(
                     children: [
                       Positioned(
-                        top: 40, // timeScaleHeight
+                        top: 40,
                         left: 0,
                         right: 0,
                         bottom: 0,
@@ -158,20 +161,23 @@ class _TimetablePageState extends State<TimetablePage> {
                             offset: offsetInPixels,
                           ),
                           const SizedBox(height: 10),
-                          showFavoritesOnly
+                          // Mode filtré (mes favoris OU équipe) → vue plate,
+                          // district affiché sur la tuile.
+                          // Mode normal → vue par district (lignes séparées).
+                          isFiltered
                               ? TimetableFavoritesView(
                                   items: displayItems,
                                   totalWidth: totalWidth,
                                   minStartTime: minStartTime,
                                   onToggleFavorite: _toggleFavorite,
-                                  onTap: _onDjCardTap, // ✅ NOUVEAU : Passe le callback
+                                  onTap: _onDjCardTap,
                                 )
                               : TimetableDistrictView(
                                   items: displayItems,
                                   totalWidth: totalWidth,
                                   minStartTime: minStartTime,
                                   onToggleFavorite: _toggleFavorite,
-                                  onTap: _onDjCardTap, // ✅ NOUVEAU : Passe le callback
+                                  onTap: _onDjCardTap,
                                 ),
                         ],
                       ),

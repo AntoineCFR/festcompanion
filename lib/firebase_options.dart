@@ -42,19 +42,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
-    appId: String.fromEnvironment('FIREBASE_ANDROID_APP_ID'),
-    messagingSenderId: String.fromEnvironment('FIREBASE_ANDROID_MESSAGING_SENDER_ID'),
-    projectId: String.fromEnvironment('FIREBASE_ANDROID_PROJECT_ID'),
-    storageBucket: String.fromEnvironment('FIREBASE_ANDROID_STORAGE_BUCKET'),
+    apiKey: 'AIzaSyDDljoxvRn6UYsnJPOWGPksKgKYNOnpaiw',
+    appId: '1:859661735898:android:a652983c7387d1598412e3',
+    messagingSenderId: '859661735898',
+    projectId: 'festcompanion',
+    storageBucket: 'festcompanion.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY'),
-    appId: String.fromEnvironment('FIREBASE_IOS_APP_ID'),
-    messagingSenderId: String.fromEnvironment('FIREBASE_IOS_MESSAGING_SENDER_ID'),
-    projectId: String.fromEnvironment('FIREBASE_IOS_PROJECT_ID'),
-    storageBucket: String.fromEnvironment('FIREBASE_IOS_STORAGE_BUCKET'),
-    iosBundleId: String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID'),
+    apiKey: 'AIzaSyDexgMrAhCHePi6mPSs5xZBXiuL9-57u68',
+    appId: '1:859661735898:ios:fd3bc631b95e73df8412e3',
+    messagingSenderId: '859661735898',
+    projectId: 'festcompanion',
+    storageBucket: 'festcompanion.firebasestorage.app',
+    iosBundleId: 'com.AntoineCFR.festcompanion',
   );
 }

@@ -24,6 +24,11 @@ class TimetableDistrictRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showFans = AppDataManager().showAllUsersFavorites;
+    final tileH = showFans
+        ? TimetableConstants.normalTileHeight + TimetableConstants.fanRowHeight
+        : TimetableConstants.normalTileHeight;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -34,7 +39,7 @@ class TimetableDistrictRow extends StatelessWidget {
         ),
         const SizedBox(height: TimetableConstants.districtSpacing),
         SizedBox(
-          height: TimetableConstants.normalTileHeight,
+          height: tileH,
           width: totalWidth,
           child: Stack(
             children: items.map((item) {
@@ -50,8 +55,8 @@ class TimetableDistrictRow extends StatelessWidget {
                   isFavorite: AppDataManager().favoriteSetIds.contains(item.setId),
                   onToggleFavorite: () => onToggleFavorite(item),
                   width: width,
-                  height: TimetableConstants.normalTileHeight,
-                  onTap: () => onTap?.call(item), // ✅ NOUVEAU : Passe le callback
+                  height: tileH,
+                  onTap: () => onTap?.call(item),
                 ),
               );
             }).toList(),

@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
+import '../../services/app_data_manager.dart';
 import 'day_selector.dart';
-import 'favorites_toggle.dart';
+import 'filter_mode_selector.dart';
 
 class LineupHeader extends StatelessWidget {
   final String selectedDay;
   final List<String> days;
-  final bool showFavoritesOnly;
+  final FavoriteFilterMode filterMode;
   final void Function(String?) onDayChanged;
-  final void Function(bool) onShowFavoritesOnlyChanged;
+  final void Function(FavoriteFilterMode) onFilterModeChanged;
 
   const LineupHeader({
     super.key,
     required this.selectedDay,
     required this.days,
-    required this.showFavoritesOnly,
+    required this.filterMode,
     required this.onDayChanged,
-    required this.onShowFavoritesOnlyChanged,
+    required this.onFilterModeChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
           DaySelector(
@@ -29,10 +30,10 @@ class LineupHeader extends StatelessWidget {
             days: days,
             onChanged: onDayChanged,
           ),
-          const SizedBox(width: 16),
-          FavoritesToggle(
-            value: showFavoritesOnly,
-            onChanged: onShowFavoritesOnlyChanged,
+          const Spacer(),
+          FilterModeSelector(
+            filterMode: filterMode,
+            onChanged: onFilterModeChanged,
           ),
         ],
       ),

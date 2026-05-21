@@ -45,11 +45,16 @@ class TimetableFavoritesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showFans = AppDataManager().showAllUsersFavorites;
+    final tileH = showFans
+        ? TimetableConstants.favoriteTileHeight + TimetableConstants.fanRowHeight
+        : TimetableConstants.favoriteTileHeight;
+
     final lines = _assignToLines(items);
     return Column(
       children: lines.map((line) {
         return SizedBox(
-          height: TimetableConstants.favoriteTileHeight,
+          height: tileH,
           width: totalWidth,
           child: Stack(
             children: line.map((item) {
@@ -65,8 +70,9 @@ class TimetableFavoritesView extends StatelessWidget {
                   isFavorite: AppDataManager().favoriteSetIds.contains(item.setId),
                   onToggleFavorite: () => onToggleFavorite(item),
                   width: width,
-                  height: TimetableConstants.favoriteTileHeight,
-                  onTap: () => onTap?.call(item), // ✅ NOUVEAU : Passe le callback
+                  height: tileH,
+                  showDistrict: true,
+                  onTap: () => onTap?.call(item),
                 ),
               );
             }).toList(),

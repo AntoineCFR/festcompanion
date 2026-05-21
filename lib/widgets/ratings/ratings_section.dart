@@ -1,19 +1,34 @@
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../services/app_data_manager.dart';
+import '../../pages/user_profile_page.dart';
+import '../team/user_avatar.dart';
 import 'rating_numbers.dart';
+import 'rating_text.dart';
 import 'rating_legend.dart';
+
+// Données combinées favori + note pour un utilisateur donné.
+class _UserSetInfo {
+  final int userId;
+  final bool isFavorite;
+  final int? notation;
+  const _UserSetInfo({
+    required this.userId,
+    required this.isFavorite,
+    required this.notation,
+  });
+}
 
 class RatingsSection extends StatefulWidget {
   final int userId;
   final int setId;
-  final VoidCallback? onRatingChanged; // ✅ NOUVEAU : Callback pour notifier le parent
+  final VoidCallback? onRatingChanged;
 
   const RatingsSection({
     super.key,
     required this.userId,
     required this.setId,
-    this.onRatingChanged, // ✅ NOUVEAU
+    this.onRatingChanged,
   });
 
   @override
@@ -21,34 +36,53 @@ class RatingsSection extends StatefulWidget {
 }
 
 class _RatingsSectionState extends State<RatingsSection> {
-  List<MapEntry<int, int?>> _ratings = [];
+  List<_UserSetInfo> _infos = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadRatings();
+    _loadInfos();
   }
 
-  void _loadRatings() {
+  void _loadInfos() {
     try {
       final allFavorites = AppDataManager().allUserFavorites;
-      final ratingsForSet = <MapEntry<int, int?>>[];
+      final result = <_UserSetInfo>[];
 
       for (final userEntry in allFavorites.entries) {
-        final userId = userEntry.key;
+        final uid = userEntry.key;
         final userFavs = userEntry.value;
-        if (userFavs.containsKey(widget.setId)) {
-          ratingsForSet.add(MapEntry(userId, userFavs[widget.setId]!.notation));
+        final fav = userFavs[widget.setId];
+        if (fav != null && (fav.isFavorite || fav.notation != null)) {
+          result.add(_UserSetInfo(
+            userId: uid,
+            isFavorite: fav.isFavorite,
+            notation: fav.notation,
+          ));
         }
       }
+
+      // S'assurer que l'utilisateur courant apparaît (même si absent de allFavorites)
+      final currentInAll = result.any((i) => i.userId == widget.userId);
+      if (!currentInAll) {
+        final myFav = AppDataManager().getUserFavorite(widget.setId);
+        if (myFav != null && (myFav.isFavorite || myFav.notation != null)) {
+          result.add(_UserSetInfo(
+            userId: widget.userId,
+            isFavorite: myFav.isFavorite,
+            notation: myFav.notation,
+          ));
+        }
+      }
+
       setState(() {
-        _ratings = ratingsForSet;
+        _infos = result;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        _ratings = [];
+        _infos = [];
         _isLoading = false;
       });
     }
@@ -60,76 +94,150 @@ class _RatingsSectionState extends State<RatingsSection> {
       (u) => u.id == widget.userId,
       orElse: () => User(id: widget.userId, username: 'Toi'),
     );
-    final currentUserRating = _ratings
-        .firstWhere((entry) => entry.key == widget.userId, orElse: () => MapEntry(widget.userId, null))
-        .value;
+    final currentInfo = _infos.firstWhere(
+      (i) => i.userId == widget.userId,
+      orElse: () =>
+          _UserSetInfo(userId: widget.userId, isFavorite: false, notation: null),
+    );
 
-    final otherUsersWithRatings = _ratings
-        .where((entry) => entry.key != widget.userId && entry.value != null)
-        .toList()
+    // Autres utilisateurs : favoris OU notés, triés par nom
+    final others = _infos.where((i) => i.userId != widget.userId).toList()
       ..sort((a, b) {
-        final userA = AppDataManager().users.firstWhere((u) => u.id == a.key);
-        final userB = AppDataManager().users.firstWhere((u) => u.id == b.key);
-        return userA.username.compareTo(userB.username);
+        final ua = AppDataManager().users.firstWhere(
+          (u) => u.id == a.userId,
+          orElse: () => User(id: a.userId, username: '?'),
+        );
+        final ub = AppDataManager().users.firstWhere(
+          (u) => u.id == b.userId,
+          orElse: () => User(id: b.userId, username: '?'),
+        );
+        return ua.username.compareTo(ub.username);
       });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Titre ───────────────────────────────────────────────────────────
         const Text(
           'Notation et tags',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 14),
+
         if (_isLoading)
           const Center(child: CircularProgressIndicator())
-        else if (_ratings.isEmpty && currentUserRating == null)
-          const Text('Aucune notation pour ce set.')
-        else
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${currentUser.username} (toi):'),
-                    const SizedBox(height: 4),
-                    RatingNumbers(
-                      rating: currentUserRating,
-                      onRatingChanged: (newRating) async {
-                        // ✅ Met à jour l'UI localement immédiatement
-                        setState(() {
-                          final index = _ratings.indexWhere((entry) => entry.key == widget.userId);
-                          if (index != -1) {
-                            _ratings[index] = MapEntry(widget.userId, newRating);
-                          } else {
-                            _ratings.add(MapEntry(widget.userId, newRating));
-                          }
-                        });
-                        await AppDataManager().rateFavorite(widget.setId, newRating ?? -1);
-                        _loadRatings();
-                        widget.onRatingChanged?.call(); // ✅ NOUVEAU : Notifie DJProfilePage
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              ...otherUsersWithRatings.map((entry) {
-                final userId = entry.key;
-                final notation = entry.value!;
-                final user = AppDataManager().users.firstWhere((u) => u.id == userId);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text('${user.username}: $notation'),
+        else ...[
+          // ── Autres utilisateurs (Wrap inline) ───────────────────────────
+          if (others.isNotEmpty) ...[
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: others.map((info) {
+                final user = AppDataManager().users.firstWhere(
+                  (u) => u.id == info.userId,
+                  orElse: () => User(id: info.userId, username: '?'),
                 );
-              }),
+                return _UserFanChip(
+                  user: user,
+                  info: info,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => UserProfilePage(user: user),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 18),
+          ],
+
+          // ── Utilisateur courant ─────────────────────────────────────────
+          Row(
+            children: [
+              UserAvatar(user: currentUser, radius: 14),
+              const SizedBox(width: 8),
+              Text(
+                '${currentUser.username} (toi)',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              if (currentInfo.isFavorite) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.star, color: Colors.amber, size: 16),
+              ],
+              const SizedBox(width: 8),
+              RatingText(rating: currentInfo.notation),
             ],
           ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          RatingNumbers(
+            rating: currentInfo.notation,
+            onRatingChanged: (newRating) async {
+              setState(() {
+                final idx = _infos.indexWhere((i) => i.userId == widget.userId);
+                final updated = _UserSetInfo(
+                  userId: widget.userId,
+                  isFavorite: currentInfo.isFavorite,
+                  notation: newRating,
+                );
+                if (idx != -1) {
+                  _infos[idx] = updated;
+                } else {
+                  _infos.add(updated);
+                }
+              });
+              await AppDataManager().rateFavorite(widget.setId, newRating);
+              _loadInfos();
+              widget.onRatingChanged?.call();
+            },
+          ),
+        ],
+
+        const SizedBox(height: 20),
         const RatingLegend(),
       ],
     );
+  }
+}
+
+// ── Chip compact pour un utilisateur (Wrap) ─────────────────────────────────
+class _UserFanChip extends StatelessWidget {
+  final User user;
+  final _UserSetInfo info;
+  final VoidCallback? onTap;
+
+  const _UserFanChip({required this.user, required this.info, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          UserAvatar(user: user, radius: 12),
+          const SizedBox(width: 6),
+          Text(
+            user.username,
+            style: const TextStyle(fontSize: 13, color: Colors.white),
+          ),
+          if (info.isFavorite) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.star, color: Colors.amber, size: 13),
+          ],
+          if (info.notation != null) ...[
+            const SizedBox(width: 6),
+            RatingText(rating: info.notation),
+          ],
+        ],
+      ),      // ferme Row
+    ),         // ferme Container
+    );         // ferme GestureDetector
   }
 }

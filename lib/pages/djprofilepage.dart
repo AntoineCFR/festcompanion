@@ -71,7 +71,9 @@ class _DJProfilePageState extends State<DJProfilePage> {
             ),
             const SizedBox(height: 8),
             DJBio(bio: widget.dj.bio.isNotEmpty ? widget.dj.bio : 'Aucune bio disponible.'),
-            const SizedBox(height: 20),
+            // Espace de sécurité : compense la barre de navigation virtuelle
+            // du téléphone pour que le contenu ne se retrouve pas derrière.
+            SizedBox(height: 24 + MediaQuery.of(context).padding.bottom),
           ],
         ),
       ),

@@ -69,9 +69,7 @@ class _ProfilePhotoState extends State<ProfilePhoto> {
                 radius: 50,
                 backgroundColor: Colors.grey[800],
                 backgroundImage: snapshot.hasData
-                    ? CachedNetworkImageProvider(
-                        '${snapshot.data}!${DateTime.now().millisecondsSinceEpoch}',
-                      )
+                    ? CachedNetworkImageProvider(snapshot.data!)
                     : null,
                 child: !snapshot.hasData
                     ? const Icon(Icons.camera_alt, size: 40, color: Colors.white54)

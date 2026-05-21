@@ -24,7 +24,7 @@ class DistrictCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Titre du district
+            // Titre
             Text(
               district.district,
               style: const TextStyle(
@@ -34,66 +34,57 @@ class DistrictCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Représentation visuelle du carré
-            Center(
+            // Carré avec les 4 coins + point de ralliement
+            AspectRatio(
+              aspectRatio: 1,
               child: Container(
-                width: 300,
-                height: 300,
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.white54, width: 2),
                 ),
                 child: Stack(
                   children: [
-                    // Points des coins
-                    _buildCornerPoint(
-                      context,
-                      'AVG',
-                      district.latAvg,
-                      district.lonAvg,
-                      Alignment.topLeft,
-                      isAdmin,
-                      () => onSetCoordinates(district.district, 'avg'),
-                      () => onOpenInMaps(district.latAvg, district.lonAvg),
+                    // AVG — Avant-Gauche (haut-gauche)
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: _buildCornerPoint(
+                        'AVG',
+                        () => onSetCoordinates(district.district, 'avg'),
+                      ),
                     ),
-                    _buildCornerPoint(
-                      context,
-                      'AVD',
-                      district.latAvd,
-                      district.lonAvd,
-                      Alignment.topRight,
-                      isAdmin,
-                      () => onSetCoordinates(district.district, 'avd'),
-                      () => onOpenInMaps(district.latAvd, district.lonAvd),
+                    // AVD — Avant-Droit (haut-droite)
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: _buildCornerPoint(
+                        'AVD',
+                        () => onSetCoordinates(district.district, 'avd'),
+                      ),
                     ),
-                    _buildCornerPoint(
-                      context,
-                      'ARG',
-                      district.latArg,
-                      district.lonArg,
-                      Alignment.bottomLeft,
-                      isAdmin,
-                      () => onSetCoordinates(district.district, 'arg'),
-                      () => onOpenInMaps(district.latArg, district.lonArg),
+                    // ARG — Arrière-Gauche (bas-gauche)
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: _buildCornerPoint(
+                        'ARG',
+                        () => onSetCoordinates(district.district, 'arg'),
+                      ),
                     ),
-                    _buildCornerPoint(
-                      context,
-                      'ARD',
-                      district.latArd,
-                      district.lonArd,
-                      Alignment.bottomRight,
-                      isAdmin,
-                      () => onSetCoordinates(district.district, 'ard'),
-                      () => onOpenInMaps(district.latArd, district.lonArd),
+                    // ARD — Arrière-Droit (bas-droite)
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: _buildCornerPoint(
+                        'ARD',
+                        () => onSetCoordinates(district.district, 'ard'),
+                      ),
                     ),
-                    // Point de ralliement au centre
+                    // Point de ralliement — centre
                     Center(
                       child: _buildRallyPoint(
-                        context,
                         district.latRallyPoint,
                         district.lonRallyPoint,
-                        isAdmin,
                         () => onSetCoordinates(district.district, 'rally'),
-                        () => onOpenInMaps(district.latRallyPoint, district.lonRallyPoint),
+                        () => onOpenInMaps(
+                          district.latRallyPoint,
+                          district.lonRallyPoint,
+                        ),
                       ),
                     ),
                   ],
@@ -106,109 +97,97 @@ class DistrictCard extends StatelessWidget {
             _buildCoordinateRow('Avant-Droit', district.latAvd, district.lonAvd),
             _buildCoordinateRow('Arrière-Gauche', district.latArg, district.lonArg),
             _buildCoordinateRow('Arrière-Droit', district.latArd, district.lonArd),
-            const Divider(color: Colors.white54),
-            _buildCoordinateRow('Point de ralliement', district.latRallyPoint, district.lonRallyPoint),
+            const Divider(color: Colors.white38),
+            _buildCoordinateRow(
+                'Point de ralliement', district.latRallyPoint, district.lonRallyPoint),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCornerPoint(
-    BuildContext context,
-    String label,
-    double lat,
-    double lng,
-    Alignment alignment,
-    bool isAdmin,
-    VoidCallback onSetCoordinates,
-    VoidCallback onOpenInMaps,
-  ) {
-    return Align(
-      alignment: alignment,
+  /// Coin AVG / AVD / ARG / ARD :
+  /// - Icône réglage visible uniquement pour l'admin
+  /// - Pas d'icône Maps (pas besoin pour les coins)
+  Widget _buildCornerPoint(String label, VoidCallback onSet) {
+    return Padding(
+      padding: const EdgeInsets.all(4),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isAdmin)
-                IconButton(
-                  icon: const Icon(Icons.settings, size: 20, color: Colors.blue),
-                  onPressed: onSetCoordinates,
-                  tooltip: 'Définir ma position',
-                ),
-              IconButton(
-                icon: const Icon(Icons.pin_drop, size: 20, color: Colors.red),
-                onPressed: onOpenInMaps,
-                tooltip: 'Voir sur Google Maps',
-              ),
-            ],
-          ),
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.settings, size: 20, color: Colors.blue),
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(4),
+              onPressed: onSet,
+              tooltip: 'Définir ma position ici',
+            ),
         ],
       ),
     );
   }
 
+  /// Point de ralliement :
+  /// - Icône localisation (tous) → ouvre Google Maps
+  /// - Icône réglage (admin seulement) → définit la position actuelle
   Widget _buildRallyPoint(
-    BuildContext context,
     double lat,
     double lng,
-    bool isAdmin,
-    VoidCallback onSetCoordinates,
-    VoidCallback onOpenInMaps,
+    VoidCallback onSet,
+    VoidCallback onOpenMaps,
   ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
           'Ralliement',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
         ),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isAdmin)
-              IconButton(
-                icon: const Icon(Icons.settings, size: 20, color: Colors.blue),
-                onPressed: onSetCoordinates,
-                tooltip: 'Définir ma position',
-              ),
             IconButton(
-              icon: const Icon(Icons.pin_drop, size: 20, color: Colors.green),
-              onPressed: onOpenInMaps,
+              icon: const Icon(Icons.near_me, size: 22, color: Colors.green),
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(6),
+              onPressed: onOpenMaps,
               tooltip: 'Voir sur Google Maps',
             ),
+            if (isAdmin)
+              IconButton(
+                icon: const Icon(Icons.settings, size: 22, color: Colors.blue),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
+                onPressed: onSet,
+                tooltip: 'Définir ma position ici',
+              ),
           ],
         ),
       ],
     );
   }
 
+  /// Ligne de coordonnées — deux lignes pour éviter l'overflow horizontal
   Widget _buildCoordinateRow(String label, double lat, double lng) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 150,
-            child: Text(
-              label,
-              style: const TextStyle(color: Colors.white70),
-            ),
-          ),
+          Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
           Text(
-            'Lat: ${lat.toStringAsFixed(6)}',
-            style: const TextStyle(color: Colors.white),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Lon: ${lng.toStringAsFixed(6)}',
-            style: const TextStyle(color: Colors.white),
+            'Lat ${lat.toStringAsFixed(6)}   Lon ${lng.toStringAsFixed(6)}',
+            style: const TextStyle(color: Colors.white, fontSize: 12),
           ),
         ],
       ),

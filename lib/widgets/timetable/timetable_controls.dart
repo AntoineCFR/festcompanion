@@ -1,51 +1,39 @@
 import 'package:flutter/material.dart';
-import '../../utils/utils.dart';
+import '../../services/app_data_manager.dart';
+import '../lineup/day_selector.dart';
+import '../lineup/filter_mode_selector.dart';
 
 class TimetableControls extends StatelessWidget {
   final String selectedDay;
   final List<String> days;
-  final bool showFavoritesOnly;
+  final FavoriteFilterMode filterMode;
   final void Function(String?) onDayChanged;
-  final void Function(bool) onShowFavoritesOnlyChanged;
+  final void Function(FavoriteFilterMode) onFilterModeChanged;
 
   const TimetableControls({
     super.key,
     required this.selectedDay,
     required this.days,
-    required this.showFavoritesOnly,
+    required this.filterMode,
     required this.onDayChanged,
-    required this.onShowFavoritesOnlyChanged,
+    required this.onFilterModeChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
-          Expanded(
-            child: DropdownButton<String>(
-              value: selectedDay,
-              items: days.map((day) {
-                return DropdownMenuItem<String>(
-                  value: day,
-                  child: Text(AppUtils.getDayName(day)),
-                );
-              }).toList(),
-              onChanged: onDayChanged,
-              hint: const Text('Choisir un jour'),
-            ),
+          DaySelector(
+            selectedDay: selectedDay,
+            days: days,
+            onChanged: onDayChanged,
           ),
-          const SizedBox(width: 16),
-          Row(
-            children: [
-              const Text('Favoris uniquement', style: TextStyle(color: Colors.white)),
-              Switch(
-                value: showFavoritesOnly,
-                onChanged: onShowFavoritesOnlyChanged,
-                activeThumbColor: const Color(0xFF7851A9),
-              ),
-            ],
+          const Spacer(),
+          FilterModeSelector(
+            filterMode: filterMode,
+            onChanged: onFilterModeChanged,
           ),
         ],
       ),

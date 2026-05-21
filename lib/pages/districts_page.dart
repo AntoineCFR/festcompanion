@@ -33,32 +33,30 @@ class _DistrictsPageState extends State<DistrictsPage> {
 
   Future<void> _loadData() async {
     try {
-      await AppDataManager().loadDistricts();
-      final districts = AppDataManager().districts;
-      if (mounted) {
-        setState(() {
-          _districts = districts;
-          _isLoading = false;
-        });
-      }
+      // Charge districts et utilisateurs en parallèle
+      await Future.wait([
+        AppDataManager().loadDistricts(),
+        AppDataManager().loadUsers(),
+      ]);
 
-      // Récupère le rôle de l'utilisateur
-      final users = AppDataManager().users;
-      final user = users.firstWhere(
+      if (!mounted) return;
+
+      final districts = List<District>.from(AppDataManager().districts)
+        ..sort((a, b) => a.district.compareTo(b.district));
+
+      final user = AppDataManager().users.firstWhere(
         (u) => u.id == widget.userId,
         orElse: () => User(id: -1, username: '', userRole: 'user'),
       );
-      if (mounted) {
-        setState(() {
-          _userRole = user.userRole;
-        });
-      }
+
+      setState(() {
+        _districts = districts;
+        _selectedDistrict = districts.isNotEmpty ? districts.first.district : null;
+        _userRole = user.userRole;
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -180,79 +178,101 @@ class _DistrictsPageState extends State<DistrictsPage> {
     }
   }
 
+  void _showDistrictPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.grey[850],
+      builder: (ctx) => ListView(
+        shrinkWrap: true,
+        children: _districts
+            .map(
+              (d) => ListTile(
+                title: Text(
+                  d.district,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: d.district == _selectedDistrict
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+                trailing: d.district == _selectedDistrict
+                    ? const Icon(Icons.check, color: Colors.blue)
+                    : null,
+                onTap: () {
+                  setState(() => _selectedDistrict = d.district);
+                  Navigator.pop(ctx);
+                },
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final current = _selectedDistrict != null
+        ? _districts.where((d) => d.district == _selectedDistrict).firstOrNull
+        : null;
+
     return Scaffold(
       backgroundColor: Colors.grey[900],
       appBar: AppBar(
         title: const Text('Districts'),
         backgroundColor: Colors.grey[800],
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_list),
-            onSelected: (String district) {
-              setState(() {
-                _selectedDistrict = district;
-              });
-            },
-            itemBuilder: (BuildContext context) => _districts
-                .map((district) => PopupMenuItem<String>(
-                      value: district.district,
-                      child: Text(district.district),
-                    ))
-                .toList(),
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  Container(
-                    color: Colors.grey[800],
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+          : Column(
+              children: [
+                // Bandeau sélecteur — cliquable
+                GestureDetector(
+                  onTap: _districts.isNotEmpty ? _showDistrictPicker : null,
+                  child: Container(
+                    width: double.infinity,
+                    color: Colors.grey[700],
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _selectedDistrict ?? 'Aucun district',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_drop_down, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ),
+                // Carte du district sélectionné
+                if (current != null)
+                  Expanded(
                     child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: _districts.map((district) {
-                          final isSelected = _selectedDistrict == district.district;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: FilterChip(
-                              label: Text(district.district),
-                              selected: isSelected,
-                              onSelected: (bool selected) {
-                                setState(() {
-                                  _selectedDistrict = selected ? district.district : null;
-                                });
-                              },
-                              backgroundColor: Colors.grey[700],
-                              selectedColor: Colors.blue[700],
-                              labelStyle: TextStyle(
-                                color: isSelected ? Colors.white : Colors.white70,
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                      padding: const EdgeInsets.all(16),
+                      child: DistrictCard(
+                        district: current,
+                        isAdmin: _isAdmin,
+                        onSetCoordinates: _setCoordinates,
+                        onOpenInMaps: _openInGoogleMaps,
+                      ),
+                    ),
+                  )
+                else
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'Aucun district disponible',
+                        style: TextStyle(color: Colors.white54),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  ..._districts
-                      .where((d) => _selectedDistrict == null || d.district == _selectedDistrict)
-                      .map((district) => Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: DistrictCard(
-                              district: district,
-                              isAdmin: _isAdmin,
-                              onSetCoordinates: _setCoordinates,
-                              onOpenInMaps: _openInGoogleMaps,
-                            ),
-                          ))
-                ],
-              ),
+              ],
             ),
     );
   }
