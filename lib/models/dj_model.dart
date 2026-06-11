@@ -1,6 +1,6 @@
 class DJ {
   final String name;
-  final String? district;
+  final String? stage;
   final DateTime? startTime;
   final DateTime? endTime;
   final String bio;
@@ -10,7 +10,7 @@ class DJ {
 
   DJ({
     required this.name,
-    this.district,
+    this.stage,
     this.startTime,
     this.endTime,
     required this.bio,
@@ -22,7 +22,7 @@ class DJ {
   factory DJ.fromMap(Map<String, dynamic> map) {
     return DJ(
       name: map['name'] ?? '',
-      district: map['district'],
+      stage: map['stage'],
       startTime: map['startTime'],
       endTime: map['endTime'],
       bio: map['bio'] ?? '',

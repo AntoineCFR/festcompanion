@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class RatingLegend extends StatelessWidget {
@@ -8,7 +9,7 @@ class RatingLegend extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.background,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.shade900),
       ),

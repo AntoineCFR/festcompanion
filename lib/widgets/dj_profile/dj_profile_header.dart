@@ -1,26 +1,75 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../utils/utils.dart';
-import '../../widgets/favorite_star.dart'; // ← NOUVEAU
+import '../../widgets/favorite_star.dart';
 
 class DJProfileHeader extends StatelessWidget {
-  final String imagePath;
+  /// Une entrée par artiste : 1 pour un solo, 2+ pour un b2b (affichées côte à côte).
+  final List<String> imagePaths;
   final String name;
-  final String? district;
+  final String? stage;
   final DateTime? startTime;
   final DateTime? endTime;
-  final bool isFavorite; // ← NOUVEAU
-  final VoidCallback onToggleFavorite; // ← NOUVEAU
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
 
   const DJProfileHeader({
     super.key,
-    required this.imagePath,
+    required this.imagePaths,
     required this.name,
-    this.district,
+    this.stage,
     this.startTime,
     this.endTime,
-    required this.isFavorite, // ← NOUVEAU
-    required this.onToggleFavorite, // ← NOUVEAU
+    required this.isFavorite,
+    required this.onToggleFavorite,
   });
+
+  Widget _fallback() => Container(
+        color: AppTheme.surface,
+        child: const Center(
+          child: Icon(Icons.person, color: Colors.white54, size: 64),
+        ),
+      );
+
+  Widget _buildHeaderImage() {
+    // Solo : image pleine largeur (comportement d'origine).
+    if (imagePaths.length <= 1) {
+      return SizedBox(
+        width: double.infinity,
+        child: Image.asset(
+          imagePaths.isNotEmpty ? imagePaths.first : '',
+          fit: BoxFit.fitWidth,
+          alignment: Alignment.topCenter,
+          errorBuilder: (context, error, stackTrace) => SizedBox(height: 200, child: _fallback()),
+        ),
+      );
+    }
+
+    // B2B : photos côte à côte. On donne aux cases un ratio PORTRAIT (plus
+    // hautes que larges) pour que le recadrage rogne les côtés et non le haut
+    // (sinon les têtes sont coupées), et on aligne en haut par sécurité.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cellWidth = constraints.maxWidth / imagePaths.length;
+        return SizedBox(
+          width: double.infinity,
+          height: cellWidth * 1.25,
+          child: Row(
+            children: imagePaths
+                .map((path) => Expanded(
+                      child: Image.asset(
+                        path,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        errorBuilder: (context, error, stackTrace) => _fallback(),
+                      ),
+                    ))
+                .toList(),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,15 +77,7 @@ class DJProfileHeader extends StatelessWidget {
       children: [
         Stack(
           children: [
-            SizedBox(
-              width: double.infinity,
-              child: Image.asset(
-                imagePath,
-                fit: BoxFit.fitWidth,
-                alignment: Alignment.topCenter,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
-              ),
-            ),
+            _buildHeaderImage(),
             // Bouton retour (à gauche)
             Positioned(
               top: 32,
@@ -50,7 +91,7 @@ class DJProfileHeader extends StatelessWidget {
                 ),
               ),
             ),
-            // ✅ Favorite star (à droite, symétrique)
+            // Favorite star (à droite, symétrique)
             Positioned(
               top: 32,
               right: 16,
@@ -73,9 +114,9 @@ class DJProfileHeader extends StatelessWidget {
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
-              if (district != null)
+              if (stage != null)
                 Text(
-                  district!,
+                  stage!,
                   style: const TextStyle(fontSize: 20),
                   textAlign: TextAlign.center,
                 ),

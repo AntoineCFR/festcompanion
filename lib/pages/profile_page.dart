@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../services/app_data_manager.dart';
 import '../models/user_model.dart';
@@ -8,8 +9,6 @@ import '../widgets/profile/profile_text_field.dart';
 import '../widgets/profile/location_toggle.dart';
 import '../widgets/profile/coordinates_section.dart';
 import '../helpers/profile_helper.dart';
-import '../helpers/location_helper.dart';
-import '../services/geoloc_background_service.dart';
 
 class ProfilePage extends StatefulWidget {
   final String username;
@@ -93,6 +92,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (value) {
       try {
+        // Active le partage : on prend un premier fix (demande la permission
+        // "pendant l'utilisation" au passage) et on l'envoie.
         await ProfileHelper.refreshLocation(widget.userId);
         setState(() {
           _profileData = _profileData?.copyWith(
@@ -104,19 +105,8 @@ class _ProfilePageState extends State<ProfilePage> {
           );
         });
         await ProfileHelper.saveLocationEnabled(true);
-
-        // Démarre les mises à jour background et demande la permission "Tout le temps"
-        await GeolocBackgroundService.setUpdatesEnabled(true, widget.userId);
-        final hasBackground = await LocationHelper.requestBackgroundPermission();
-
-        if (hasBackground) {
-          _showSnackBar('Localisation activée — mises à jour en fond toutes les 15 min.');
-        } else {
-          _showSnackBar(
-            'Localisation activée. Pour les mises à jour en fond, '
-            'sélectionnez « Autoriser tout le temps » dans les paramètres.',
-          );
-        }
+        _showSnackBar('Partage de position activé. Votre position se met à jour '
+            'à l\'ouverture de l\'app et lors d\'une alerte "perdu".');
       } catch (e) {
         setState(() => _profileData = _profileData?.copyWith(locationEnabled: false));
         _showSnackBar('Erreur de localisation : $e');
@@ -124,8 +114,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } else {
       setState(() => _profileData = _profileData?.copyWith(locationEnabled: false));
       await ProfileHelper.saveLocationEnabled(false);
-      await GeolocBackgroundService.setUpdatesEnabled(false, widget.userId);
-      _showSnackBar('Localisation désactivée.');
+      _showSnackBar('Partage de position désactivé.');
     }
   }
 
@@ -200,7 +189,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       appBar: ProfileAppBar(onSavePressed: _saveProfile),
       body: Container(
-        color: Colors.grey[900],
+        color: AppTheme.background,
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: SingleChildScrollView(

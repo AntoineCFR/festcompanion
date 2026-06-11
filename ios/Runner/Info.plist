@@ -25,11 +25,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Cette application utilise votre position pour afficher votre emplacement sur la carte et partager votre localisation avec vos amis.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Cette application utilise votre position en arrière-plan pour afficher votre emplacement sur la carte et partager votre localisation avec vos amis.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Cette application utilise votre position en arrière-plan pour mettre à jour votre localisation périodiquement et partager votre position avec votre équipe.</string>
+    <string>Cette application utilise votre position, pendant que vous l'utilisez, pour partager votre emplacement avec votre équipe et vous aider à vous retrouver.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>          <!-- ✅ Appels téléphoniques -->
@@ -41,8 +37,6 @@
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
-    	<string>fetch</string>
-    	<string>location</string>
     	<string>remote-notification</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>

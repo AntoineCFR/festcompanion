@@ -71,7 +71,7 @@ class TimetableFavoritesView extends StatelessWidget {
                   onToggleFavorite: () => onToggleFavorite(item),
                   width: width,
                   height: tileH,
-                  showDistrict: true,
+                  showStage: true,
                   onTap: () => onTap?.call(item),
                 ),
               );

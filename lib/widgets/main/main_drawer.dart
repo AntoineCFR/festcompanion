@@ -1,7 +1,11 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../pages/profile_page.dart';
 import '../../pages/team_page.dart';
-import '../../pages/districts_page.dart'; // NOUVEAU
+import '../../pages/stages_page.dart';
+import '../../pages/festival_selection_page.dart';
+import '../../pages/theme_page.dart';
+import '../../services/app_data_manager.dart';
 
 class MainDrawer extends StatelessWidget {
   final String username;
@@ -18,13 +22,13 @@ class MainDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.background,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
             decoration: BoxDecoration(
-              color: Colors.grey[800],
+              color: AppTheme.surface,
             ),
             child: Text(
               username,
@@ -69,11 +73,11 @@ class MainDrawer extends StatelessWidget {
               );
             },
           ),
-          // NOUVEAU: Entrée pour les districts
+          // Entrée pour les scènes (ex-districts)
           ListTile(
             leading: const Icon(Icons.location_city, color: Colors.white),
             title: const Text(
-              'Districts',
+              'Scènes',
               style: TextStyle(color: Colors.white),
             ),
             onTap: () {
@@ -81,11 +85,50 @@ class MainDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DistrictsPage(
+                  builder: (context) => StagesPage(
                     username: username,
                     userId: userId,
                   ),
                 ),
+              );
+            },
+          ),
+          // Changer de festival
+          ListTile(
+            leading: const Icon(Icons.festival, color: Colors.white),
+            title: const Text(
+              'Changer de festival',
+              style: TextStyle(color: Colors.white),
+            ),
+            onTap: () async {
+              Navigator.pop(context);
+              // Purge les données du festival courant puis relance la sélection.
+              await AppDataManager().clearSelectedFestival();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => FestivalGate(
+                    userId: userId,
+                    username: username,
+                    forceSelection: true,
+                  ),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+          // Thème
+          ListTile(
+            leading: const Icon(Icons.palette, color: Colors.white),
+            title: const Text(
+              'Thème',
+              style: TextStyle(color: Colors.white),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ThemePage()),
               );
             },
           ),

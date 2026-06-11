@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'timetable_constants.dart';
 
@@ -49,7 +50,7 @@ class TimeScale extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: TimetableConstants.timeScaleHeight,
-      color: Colors.grey[900],
+      color: AppTheme.background,
       child: Row(children: _buildTimeLabels(minStartTime, maxEndTime, offset)),
     );
   }

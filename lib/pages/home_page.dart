@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../models/timetable_item.dart';
@@ -75,7 +76,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     if (_firstSetItem == null) {
       return Container(
-        color: Colors.grey[900],
+        color: AppTheme.background,
         child: const Center(
           child: Text(
             'Aucun set trouvé',
@@ -88,7 +89,7 @@ class _HomePageState extends State<HomePage> {
     final difference = HomeHelper.calculateTimeDifference(_firstSetItem!.startTime);
 
     return Container(
-      color: Colors.grey[900],
+      color: AppTheme.background,
       child: SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

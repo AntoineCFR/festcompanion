@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../services/app_data_manager.dart';
 
@@ -26,9 +27,9 @@ class FilterModeSelector extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       color: Colors.white54,
       selectedColor: Colors.white,
-      fillColor: const Color(0xFF7851A9),
+      fillColor: AppTheme.accent,
       borderColor: Colors.white24,
-      selectedBorderColor: const Color(0xFF7851A9),
+      selectedBorderColor: AppTheme.accent,
       children: const [
         Text('Tous',     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         Text('Mes fav.', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),

@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'profile_text_field.dart';
 
@@ -19,7 +20,7 @@ class CoordinatesSection extends StatelessWidget {
           child: ProfileTextField(
             labelText: 'Latitude',
             labelStyle: const TextStyle(color: Colors.white70),
-            fillColor: Colors.grey[800],
+            fillColor: AppTheme.surface,
             controller: TextEditingController(
               text: latitude?.toStringAsFixed(6) ?? '',
             ),
@@ -31,7 +32,7 @@ class CoordinatesSection extends StatelessWidget {
           child: ProfileTextField(
             labelText: 'Longitude',
             labelStyle: const TextStyle(color: Colors.white70),
-            fillColor: Colors.grey[800],
+            fillColor: AppTheme.surface,
             controller: TextEditingController(
               text: longitude?.toStringAsFixed(6) ?? '',
             ),

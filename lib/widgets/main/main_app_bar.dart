@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'profile_avatar.dart';
+import '../../services/app_data_manager.dart';
 
 class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String username;
@@ -20,7 +21,7 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
         icon: const Icon(Icons.menu),
         onPressed: onMenuPressed,
       ),
-      title: const Text('Extrema Outdoor 2026'),
+      title: Text(AppDataManager().selectedFestival?.name ?? 'FestCompanion'),
       actions: [
         ProfileAvatar(
           userId: userId,

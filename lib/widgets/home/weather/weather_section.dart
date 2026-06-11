@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/weather_model.dart';
+import '../../../services/app_data_manager.dart';
 import 'weather_card.dart';
 
 class WeatherSection extends StatelessWidget {
@@ -12,15 +13,16 @@ class WeatherSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final city = AppDataManager().selectedFestival?.city;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 8),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
           child: Text(
-            'Météo à Houthalen-Helchteren',
-            style: TextStyle(
+            city != null ? 'Météo à $city' : 'Météo',
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.white,

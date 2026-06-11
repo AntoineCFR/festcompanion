@@ -23,7 +23,6 @@ dependencies:
   geolocator: ^14.0.2
   cached_network_image: ^3.3.0
   clipboard: ^3.0.14  # ✅ Pour copier le numéro dans le presse-papier
-  workmanager: ^0.9.0  # Pour Android
   location: ^8.0.1
   flutter_dotenv: ^6.0.1
   flutter_local_notifications: ^18.0.0  # Affichage notifications locales (foreground)

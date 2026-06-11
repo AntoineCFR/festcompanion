@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import 'user_avatar.dart';
@@ -21,11 +22,11 @@ class UserCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasPhone = user.phoneNumber?.isNotEmpty == true;
-    final district = user.lastLocation == '?' ? null : user.lastLocation;
+    final stageName = user.lastLocation == '?' ? null : user.lastLocation;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      color: Colors.grey[800],
+      color: AppTheme.surface,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -61,7 +62,7 @@ class UserCard extends StatelessWidget {
                         const Icon(Icons.location_on, size: 12, color: Colors.white54),
                         const SizedBox(width: 3),
                         Text(
-                          'Position actuelle : ${district ?? 'autre'}',
+                          'Position actuelle : ${stageName ?? 'autre'}',
                           style: const TextStyle(color: Colors.white54, fontSize: 11),
                         ),
                       ],

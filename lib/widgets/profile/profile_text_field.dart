@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class ProfileTextField extends StatelessWidget {
@@ -31,13 +32,13 @@ class ProfileTextField extends StatelessWidget {
         hintText: hintText,
         hintStyle: const TextStyle(color: Colors.white54, fontSize: 12),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.grey[700]!),
+          borderSide: BorderSide(color: AppTheme.surfaceAlt),
         ),
         disabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.grey[700]!),
+          borderSide: BorderSide(color: AppTheme.surfaceAlt),
         ),
         filled: true,
-        fillColor: fillColor ?? Colors.grey[800],
+        fillColor: fillColor ?? AppTheme.surface,
       ),
       style: style ?? const TextStyle(color: Colors.white),
       controller: controller,

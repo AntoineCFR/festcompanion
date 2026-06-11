@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'services/app_data_manager.dart';
 import 'services/local_storage_service.dart';
+import 'theme/app_theme.dart';
 import 'pages/splash_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -24,24 +25,43 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
 void main() async {
-  await dotenv.load(fileName: ".env");
+  // ⚠️ DOIT être la toute première instruction : dotenv.load et l'accès aux
+  // assets passent par rootBundle, qui exige le binding initialisé. L'appeler
+  // après provoquait une exception au démarrage sur iOS → écran blanc.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // .env : un échec (asset absent, etc.) ne doit JAMAIS bloquer le lancement.
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('[main] .env non chargé (on continue) : $e');
+  }
+
   await LocalStorageService().init(); // SharedPreferences avant tout
 
-  // Initialisation Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Restaure le festival sélectionné (définit ApiService.currentFestivalId).
+  await AppDataManager().restoreSelectedFestival();
 
-  // Enregistre le handler pour les messages reçus quand l'app est fermée/en fond.
-  // Doit être appelé avant runApp().
-  FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
+  // Restaure et applique le thème (mode auto = suit le festival).
+  await AppTheme.init(AppDataManager().selectedFestival?.slug);
 
-  // Souscrit immédiatement au topic "all_users" — sans attendre le login.
-  // Fait ici car : (1) ne dépend pas de l'utilisateur, (2) doit être actif
-  // même si l'app est fermée, (3) se réessaie à chaque démarrage si ça a
-  // raté la fois précédente.
-  await FirebaseMessaging.instance.subscribeToTopic('all_users');
+  // Firebase : si l'init échoue, on démarre quand même l'app (UI dégradée)
+  // plutôt que de rester bloqué sur un écran blanc.
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // Handler des messages reçus app fermée/en fond. Doit être appelé avant runApp().
+    FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
+
+    // Souscription au topic "all_users" en TÂCHE DE FOND (non awaité) : sur un
+    // réseau capricieux en festival, l'awaiter ici pouvait retarder runApp()
+    // et figer l'app sur un écran blanc. On réessaie à chaque démarrage.
+    FirebaseMessaging.instance.subscribeToTopic('all_users').ignore();
+  } catch (e) {
+    debugPrint('[main] Initialisation Firebase échouée (on continue) : $e');
+  }
 
   AppDataManager().setScaffoldMessengerKey(scaffoldMessengerKey);
 
@@ -80,12 +100,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Extrema Outdoor 2026',
-      theme: ThemeData.dark(),
-      scaffoldMessengerKey: scaffoldMessengerKey,
-      navigatorKey: navigatorKey,
-      home: const SplashScreen(),
+    // Rebuild toute l'app quand le thème change.
+    return ValueListenableBuilder<int>(
+      valueListenable: AppTheme.revision,
+      builder: (context, _, _) {
+        return MaterialApp(
+          title: AppDataManager().selectedFestival?.name ?? 'FestCompanion',
+          theme: AppTheme.themeData(),
+          scaffoldMessengerKey: scaffoldMessengerKey,
+          navigatorKey: navigatorKey,
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

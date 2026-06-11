@@ -3,11 +3,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/timetable_item.dart';
 import '../models/user_model.dart';
 import '../models/user_favorite.dart';
-import '../models/district_model.dart';
-import '../models/event_model.dart'; // ✅ Ajouté pour typer les événements
+import '../models/stage_model.dart';
+import '../models/festival_model.dart';
+import '../models/event_model.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/profile_service.dart';
+import '../theme/app_theme.dart';
 
 // ✅ Clé globale pour precacheImage
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -30,8 +32,11 @@ class AppDataManager {
     _userFavorites = {};
     _allUserFavorites = {};
     _allFavoritesLoaded = false;
-    _userEvents = []; // Initialisation
+    _userEvents = [];
   }
+
+  // Festival sélectionné (état de session, partagé par toutes les pages)
+  Festival? _selectedFestival;
 
   // Données globales (indépendantes de l'utilisateur)
   List<TimetableItem> _timetable = [];
@@ -47,15 +52,13 @@ class AppDataManager {
   FavoriteFilterMode _filterMode = FavoriteFilterMode.normal;
   GlobalKey<ScaffoldMessengerState>? _scaffoldMessengerKey;
 
-  // Données districts
-  List<District> _districts = [];
-  bool _isLoadingDistricts = false;
+  // Données scènes (ex-districts)
+  List<Stage> _stages = [];
+  bool _isLoadingStages = false;
 
   // Données événements (typées avec Event)
   List<Event> _userEvents = [];
   bool _isLoadingEvents = false;
-
-  // (remplacé par _filterMode — plus de champ séparé)
 
   // Setter pour le GlobalKey
   void setScaffoldMessengerKey(GlobalKey<ScaffoldMessengerState> key) {
@@ -87,6 +90,58 @@ class AppDataManager {
       );
     }
     debugPrint('⚠️ [AppDataManager] $message');
+  }
+
+  // ========== FESTIVAL ==========
+
+  Festival? get selectedFestival => _selectedFestival;
+  int? get selectedFestivalId => _selectedFestival?.festivalId;
+
+  /// Restaure le festival sélectionné depuis le stockage (appelé au démarrage).
+  Future<void> restoreSelectedFestival() async {
+    final festival = await LocalStorageService().getSelectedFestival();
+    if (festival != null) {
+      _selectedFestival = festival;
+      ApiService.currentFestivalId = festival.festivalId;
+    }
+  }
+
+  /// Sélectionne un festival et le persiste (+ propage à ApiService).
+  Future<void> setSelectedFestival(Festival festival) async {
+    _selectedFestival = festival;
+    ApiService.currentFestivalId = festival.festivalId;
+    AppTheme.onFestivalChanged(festival.slug);  // thème auto = suit le festival
+    await LocalStorageService().saveSelectedFestival(festival);
+  }
+
+  /// Désélectionne le festival courant et purge les données associées.
+  Future<void> clearSelectedFestival() async {
+    _selectedFestival = null;
+    ApiService.currentFestivalId = null;
+    AppTheme.onFestivalChanged(null);
+    await LocalStorageService().clearSelectedFestival();
+    reset();
+    _stages = [];
+  }
+
+  /// Jours du festival, déduits de la timetable et triés par day_int.
+  List<String> get festivalDays {
+    final dayOrder = <String, int>{};
+    for (final item in _timetable) {
+      dayOrder.putIfAbsent(item.day, () => item.dayInt);
+    }
+    final days = dayOrder.keys.toList()
+      ..sort((a, b) => dayOrder[a]!.compareTo(dayOrder[b]!));
+    return days;
+  }
+
+  void _ensureValidSelectedDay() {
+    final days = festivalDays;
+    if (days.isEmpty) return;
+    if (!days.contains(_selectedDay)) {
+      _selectedDay = days.first;
+      LocalStorageService().saveSelectedDay(_selectedDay);
+    }
   }
 
   // Getters pour les données globales
@@ -135,9 +190,9 @@ class AppDataManager {
   bool get showAllUsersFavorites => _filterMode == FavoriteFilterMode.teamFavorites;
   int? get userId => _userId;
 
-  // Getters pour les districts
-  List<District> get districts => _districts;
-  bool get isLoadingDistricts => _isLoadingDistricts;
+  // Getters pour les scènes
+  List<Stage> get stages => _stages;
+  bool get isLoadingStages => _isLoadingStages;
 
   // Getters pour les événements (typé)
   List<Event> get userEvents => _userEvents;
@@ -146,45 +201,54 @@ class AppDataManager {
   // Récupère UserFavorite pour un set_id
   UserFavorite? getUserFavorite(int setId) => _userFavorites[setId];
 
-  // Charge les données GLOBALES (timetable + utilisateurs + TOUS les favoris)
+  // Charge les données GLOBALES (timetable + utilisateurs + TOUS les favoris).
+  // Les trois requêtes sont indépendantes → on les lance EN PARALLÈLE pour
+  // raccourcir nettement le temps de chargement au lancement.
   Future<void> loadAllData() async {
     try {
-      await loadTimetable();
-      await loadUsers();
-      await loadAllUserFavorites();
+      await Future.wait([
+        loadTimetable(),
+        loadUsers(),
+        loadAllUserFavorites(),
+      ]);
     } catch (e) {
       _showErrorMessage('Erreur lors du chargement des données globales : $e');
       rethrow;
     }
   }
 
-  // Charge la timetable (globale)
+  // Charge la timetable du festival sélectionné
   Future<void> loadTimetable() async {
+    final fid = selectedFestivalId;
+    if (fid == null) throw Exception('Aucun festival sélectionné.');
     try {
       _timetable = await ApiService.fetchTimetable();
-      await LocalStorageService().saveTimetable(_timetable);
+      await LocalStorageService().saveTimetable(_timetable, fid);
     } catch (e) {
       _showErrorMessage('Impossible de charger la timetable depuis le serveur.');
-      _timetable = await LocalStorageService().getTimetable();
+      _timetable = await LocalStorageService().getTimetable(fid);
       rethrow;
+    } finally {
+      _ensureValidSelectedDay();
     }
   }
 
-  // Charge les utilisateurs (globaux)
+  // Charge les utilisateurs présents sur le festival
   Future<void> loadUsers() async {
     try {
       _users = (await ApiService.fetchUsers()).map((map) => User.fromMap(map)).toList();
       _photoUrls.clear();
 
-      for (final user in _users) {
-        final int userId = user.id;
-        final photoUrl = await ProfileService.getPhotoUrl(userId);
-        _photoUrls[userId] = photoUrl;
+      // Récupère les URLs de photos EN PARALLÈLE (auparavant : une requête
+      // Firebase Storage séquentielle par utilisateur → très lent au lancement).
+      await Future.wait(_users.map((user) async {
+        final photoUrl = await ProfileService.getPhotoUrl(user.id);
+        _photoUrls[user.id] = photoUrl;
 
         if (photoUrl != null && navigatorKey.currentContext != null) {
           precacheImage(CachedNetworkImageProvider(photoUrl), navigatorKey.currentContext!);
         }
-      }
+      }));
     } catch (e) {
       _showErrorMessage('Impossible de charger les utilisateurs : $e');
       _users = [];
@@ -220,22 +284,22 @@ class AppDataManager {
 
   // Charge les favoris de l'utilisateur connecté
   Future<void> loadFavorites(int userId) async {
+    final fid = selectedFestivalId;
     try {
       _userId = userId;
 
       if (_allFavoritesLoaded && _allUserFavorites.containsKey(userId)) {
-        // Copie shallow pour éviter l'aliasing : modifier _userFavorites
-        // ne doit pas altérer silencieusement _allUserFavorites et vice-versa.
+        // Copie shallow pour éviter l'aliasing.
         _userFavorites = Map.from(_allUserFavorites[userId]!);
       } else {
         final serverFavorites = await ApiService.fetchUserFavorites(userId) as Map<int, UserFavorite>;
         _userFavorites = serverFavorites;
       }
 
-      await LocalStorageService().saveUserFavorites(_userFavorites);
+      if (fid != null) await LocalStorageService().saveUserFavorites(_userFavorites, fid);
     } catch (e) {
       _showErrorMessage('Impossible de charger les favoris depuis le serveur.');
-      _userFavorites = await LocalStorageService().getUserFavorites();
+      if (fid != null) _userFavorites = await LocalStorageService().getUserFavorites(fid);
       rethrow;
     }
   }
@@ -248,14 +312,14 @@ class AppDataManager {
     }
   }
 
-  // Met à jour la localisation d'un utilisateur + district
-  void updateUserLocation(int userId, double lat, double lng, {String? district}) {
+  // Met à jour la localisation d'un utilisateur + scène
+  void updateUserLocation(int userId, double lat, double lng, {String? stage}) {
     final index = _users.indexWhere((u) => u.id == userId);
     if (index != -1) {
       _users[index] = _users[index].copyWith(
         lastLat: lat,
         lastLng: lng,
-        lastLocation: district ?? _users[index].lastLocation,
+        lastLocation: stage ?? _users[index].lastLocation,
       );
     }
   }
@@ -268,7 +332,7 @@ class AppDataManager {
     }
   }
 
-  // Réinitialisation des données
+  // Réinitialisation des données (utilisateur). Conserve le festival sélectionné.
   void reset() {
     _timetable = [];
     _userFavorites = {};
@@ -278,7 +342,7 @@ class AppDataManager {
     _selectedDay = 'friday';
     _filterMode = FavoriteFilterMode.normal;
     _users = [];
-    _userEvents = []; // ✅ Réinitialisation des événements
+    _userEvents = [];
   }
 
   void setSelectedDay(String day) {
@@ -299,6 +363,7 @@ class AppDataManager {
 
   // Toggle favori pour un set_id
   Future<void> toggleFavorite(int setId) async {
+    final fid = selectedFestivalId;
     final current = _userFavorites[setId];
     final newIsFavorite = current == null ? true : !current.isFavorite;
 
@@ -308,7 +373,7 @@ class AppDataManager {
       notation: current?.notation,
     );
 
-    await LocalStorageService().saveUserFavorites(_userFavorites);
+    if (fid != null) await LocalStorageService().saveUserFavorites(_userFavorites, fid);
 
     if (_userId != null) {
       try {
@@ -325,6 +390,7 @@ class AppDataManager {
 
   // Met à jour la notation
   Future<void> rateFavorite(int setId, int? notation) async {
+    final fid = selectedFestivalId;
     bool currentIsFavorite = false;
     if (_allUserFavorites.containsKey(_userId) && _allUserFavorites[_userId]!.containsKey(setId)) {
       currentIsFavorite = _allUserFavorites[_userId]![setId]!.isFavorite;
@@ -333,8 +399,6 @@ class AppDataManager {
     }
 
     // Reconstruction explicite pour pouvoir effacer la notation (null).
-    // On ne passe pas par copyWith(notation: notation) car null serait ignoré
-    // si l'utilisateur veut supprimer sa note.
     _userFavorites[setId] = UserFavorite(
       setId: setId,
       isFavorite: currentIsFavorite,
@@ -345,7 +409,7 @@ class AppDataManager {
       _allUserFavorites.putIfAbsent(_userId!, () => {})[setId] = _userFavorites[setId]!;
     }
 
-    await LocalStorageService().saveUserFavorites(_userFavorites);
+    if (fid != null) await LocalStorageService().saveUserFavorites(_userFavorites, fid);
 
     if (_userId != null) {
       try {
@@ -356,10 +420,10 @@ class AppDataManager {
     }
   }
 
-  // Synchronise les notations en arrière-plan (ne re-toggle PAS les favoris
-  // car l'API toggle inverse l'état côté serveur — dangereux si appelé en boucle)
+  // Synchronise les notations en arrière-plan
   Future<void> syncFavorites() async {
     if (_userId == null) return;
+    final fid = selectedFestivalId;
     try {
       for (final entry in _userFavorites.entries) {
         final setId = entry.key;
@@ -371,35 +435,38 @@ class AppDataManager {
       if (_allUserFavorites.containsKey(_userId!)) {
         _allUserFavorites[_userId!] = Map.from(_userFavorites);
       }
-      await LocalStorageService().saveUserFavorites(_userFavorites);
+      if (fid != null) await LocalStorageService().saveUserFavorites(_userFavorites, fid);
     } catch (e) {
       _showErrorMessage('Impossible de synchroniser les favoris avec le serveur.');
     }
   }
 
-  // Charge les districts
-  Future<void> loadDistricts() async {
-    if (_districts.isNotEmpty) return;
+  // Charge les scènes
+  Future<void> loadStages() async {
+    if (_stages.isNotEmpty) return;
+    final fid = selectedFestivalId;
+    if (fid == null) throw Exception('Aucun festival sélectionné.');
 
-    _isLoadingDistricts = true;
+    _isLoadingStages = true;
     try {
-      _districts = await ApiService.fetchDistricts();
-      await LocalStorageService().saveDistricts(_districts);
+      _stages = await ApiService.fetchStages();
+      await LocalStorageService().saveStages(_stages, fid);
     } catch (e) {
-      _showErrorMessage('Impossible de charger les districts depuis le serveur.');
-      _districts = await LocalStorageService().getDistricts();
+      _showErrorMessage('Impossible de charger les scènes depuis le serveur.');
+      _stages = await LocalStorageService().getStages(fid);
       rethrow;
     } finally {
-      _isLoadingDistricts = false;
+      _isLoadingStages = false;
     }
   }
 
-  // Met à jour un district
-  Future<void> updateDistrict(String districtName, Map<String, dynamic> coordinates) async {
+  // Met à jour une scène
+  Future<void> updateStage(String stageName, Map<String, dynamic> coordinates) async {
+    final fid = selectedFestivalId;
     try {
-      final index = _districts.indexWhere((d) => d.district == districtName);
+      final index = _stages.indexWhere((s) => s.stage == stageName);
       if (index != -1) {
-        final updatedDistrict = _districts[index].copyWith(
+        _stages[index] = _stages[index].copyWith(
           latAvg: coordinates['lat_avg']?.toDouble(),
           lonAvg: coordinates['lon_avg']?.toDouble(),
           latAvd: coordinates['lat_avd']?.toDouble(),
@@ -411,19 +478,17 @@ class AppDataManager {
           latRallyPoint: coordinates['lat_rally_point']?.toDouble(),
           lonRallyPoint: coordinates['lon_rally_point']?.toDouble(),
         );
-        _districts[index] = updatedDistrict;
       }
 
-      await ApiService.updateDistrict(districtName, coordinates);
-      await LocalStorageService().saveDistricts(_districts);
+      await ApiService.updateStage(stageName, coordinates);
+      if (fid != null) await LocalStorageService().saveStages(_stages, fid);
     } catch (e) {
-      _showErrorMessage('Impossible de mettre à jour le district.');
+      _showErrorMessage('Impossible de mettre à jour la scène.');
       rethrow;
     }
   }
 
   // ========== EVENT MANAGEMENT ==========
-  // Charge les événements d'un utilisateur (avec userId explicite pour events_page)
   Future<void> loadUserEvents(int userId) async {
     _isLoadingEvents = true;
     try {
@@ -438,63 +503,37 @@ class AppDataManager {
     }
   }
 
-  // Ajoute un événement (avec userId explicite)
-  Future<void> addEvent(int userId, String eventType) async {
-    try {
-      await ApiService.createEvent(
-        userId: userId,
-        eventType: eventType,
-      );
-      // On construit l'Event localement : la réponse API est un Map brut,
-      // pas un Event. Le timestamp serveur n'est pas critique ici.
-      _userEvents.insert(0, Event(
-        userId: userId,
-        timestamp: DateTime.now(),
-        eventType: eventType,
-      ));
-
-      // Si "perdu", recharge les utilisateurs pour refléter les districts
-      // mis à jour côté serveur (le backend s'en charge lui-même dans create_event).
-      if (eventType == 'perdu') {
-        await loadUsers();
-      }
-    } catch (e) {
-      _showErrorMessage('Impossible d\'ajouter l\'événement : $e');
-      rethrow;
+  /// Crée l'événement côté serveur. L'affichage optimiste (insertion immédiate
+  /// dans la liste) est géré par l'appelant (EventsPage) pour un retour
+  /// instantané ; ici on ne fait que l'I/O réseau + les effets de bord.
+  /// Pour "perdu", recharge les utilisateurs (le backend a recalculé les scènes).
+  Future<void> createEventRemote(int userId, String eventType) async {
+    await ApiService.createEvent(userId: userId, eventType: eventType);
+    if (eventType == 'perdu') {
+      await loadUsers();
     }
   }
 
-  Future<void> deleteLastEvent(int userId) async {
-    if (_userEvents.isEmpty) return;
-    try {
-      await ApiService.deleteLastEvent(userId);
-      // Retire optimistement le premier élément (le plus récent)
-      _userEvents.removeAt(0);
-    } catch (e) {
-      _showErrorMessage('Impossible de supprimer l\'événement : $e');
-      rethrow;
-    }
+  /// Supprime le dernier événement côté serveur (l'optimisme est géré par l'appelant).
+  Future<void> deleteLastEventRemote(int userId) async {
+    await ApiService.deleteLastEvent(userId);
   }
 
   // ========== GÉOLOCALISATION ==========
-  // Met à jour la géolocalisation + district pour un utilisateur
   Future<void> updateGeoloc({
     required int userId,
     required double lat,
     required double lng,
-    String? district,
+    String? stage,
   }) async {
     try {
-      // 1. Met à jour en backend
       await ApiService.updateGeoloc(
         userId: userId,
         lat: lat,
         lng: lng,
-        district: district,
+        stage: stage,
       );
-
-      // 2. Met à jour localement
-      updateUserLocation(userId, lat, lng, district: district);
+      updateUserLocation(userId, lat, lng, stage: stage);
     } catch (e) {
       _showErrorMessage('Impossible de mettre à jour la géolocalisation : $e');
       rethrow;

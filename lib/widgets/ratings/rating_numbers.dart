@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class RatingNumbers extends StatefulWidget {
@@ -52,7 +53,7 @@ class _RatingNumbersState extends State<RatingNumbers> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
-              color: isSelected ? Colors.amber : Colors.grey[800],
+              color: isSelected ? Colors.amber : AppTheme.surface,
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
                 color: isSelected ? Colors.amber : Colors.grey.shade800,

@@ -38,10 +38,10 @@ class LineupHelper {
         if (startCompare != 0) return startCompare;
         int endCompare = a.endTime.compareTo(b.endTime);
         if (endCompare != 0) return endCompare;
-        return a.district.compareTo(b.district);
+        return TimetableItem.compareByStage(a, b);
       } else {
-        int districtCompare = a.district.compareTo(b.district);
-        if (districtCompare != 0) return districtCompare;
+        int stageCompare = TimetableItem.compareByStage(a, b);
+        if (stageCompare != 0) return stageCompare;
         return a.startTime.compareTo(b.startTime);
       }
     });
@@ -49,10 +49,10 @@ class LineupHelper {
     return displayItems;
   }
 
-  static Map<String, List<TimetableItem>> groupByDistrict(List<TimetableItem> items) {
+  static Map<String, List<TimetableItem>> groupByStage(List<TimetableItem> items) {
     final Map<String, List<TimetableItem>> grouped = {};
     for (var item in items) {
-      grouped.putIfAbsent(item.district, () => []).add(item);
+      grouped.putIfAbsent(item.stage, () => []).add(item);
     }
     return grouped;
   }

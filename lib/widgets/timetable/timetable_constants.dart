@@ -10,13 +10,13 @@ class TimetableConstants {
   /// Largeur fixe de la photo DJ dans la tuile (indépendante de la hauteur).
   static const double photoWidth = 48.0;
   static const double timeScaleHeight = 40.0;
-  static const double districtSpacing = 2.0;
+  static const double stageSpacing = 2.0;
   static const EdgeInsets cardMargin = EdgeInsets.symmetric(vertical: 5, horizontal: 2);
   static const EdgeInsets cardPadding = EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0);
 
   static const TextStyle timeScaleTextStyle = TextStyle(fontSize: 14, color: Colors.white);
   static const TextStyle djTextStyle = TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white);
   static const TextStyle timeTextStyle = TextStyle(fontSize: 12, color: Colors.white70);
-  static const TextStyle districtTextStyle = TextStyle(fontSize: 12, color: Colors.white);
-  static const TextStyle districtSubtitleStyle = TextStyle(fontSize: 12, color: Colors.white54);
+  static const TextStyle stageTextStyle = TextStyle(fontSize: 12, color: Colors.white);
+  static const TextStyle stageSubtitleStyle = TextStyle(fontSize: 12, color: Colors.white54);
 }

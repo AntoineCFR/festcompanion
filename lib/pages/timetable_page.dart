@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
 import '../models/dj_model.dart';
@@ -6,7 +7,7 @@ import '../widgets/timetable/timetable_controls.dart';
 import '../widgets/timetable/empty_timetable_state.dart';
 import '../widgets/timetable/time_scale.dart';
 import '../widgets/timetable/vertical_time_lines.dart';
-import '../widgets/timetable/timetable_district_view.dart';
+import '../widgets/timetable/timetable_stage_view.dart';
 import '../widgets/timetable/timetable_favorites_view.dart';
 import '../helpers/timetable_helper.dart';
 import 'djprofilepage.dart';
@@ -26,7 +27,6 @@ class TimetablePage extends StatefulWidget {
 }
 
 class _TimetablePageState extends State<TimetablePage> {
-  final List<String> _days = const ['friday', 'saturday', 'sunday'];
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -58,7 +58,7 @@ class _TimetablePageState extends State<TimetablePage> {
           dj: DJ(
             name: item.dj,
             bio: item.bio ?? '',
-            district: item.district,
+            stage: item.stage,
             startTime: item.startTime,
             endTime: item.endTime,
             spotifyLink: item.spotifyLink,
@@ -92,6 +92,7 @@ class _TimetablePageState extends State<TimetablePage> {
 
     final filterMode = AppDataManager().filterMode;
     final selectedDay = AppDataManager().selectedDay;
+    final days = AppDataManager().festivalDays;
     final isFiltered = filterMode != FavoriteFilterMode.normal;
 
     final displayItems = TimetableHelper.filterAndSortTimetable(
@@ -105,9 +106,9 @@ class _TimetablePageState extends State<TimetablePage> {
 
     if (displayItems.isEmpty) {
       return Container(
-        color: Colors.grey[900],
+        color: AppTheme.background,
         child: EmptyTimetableState(
-          days: _days,
+          days: days,
           selectedDay: selectedDay,
           filterMode: filterMode,
           onDayChanged: _onDayChanged,
@@ -122,12 +123,12 @@ class _TimetablePageState extends State<TimetablePage> {
     final offsetInPixels = TimetableHelper.calculateOffset(minStartTime);
 
     return Container(
-      color: Colors.grey[900],
+      color: AppTheme.background,
       child: Column(
         children: [
           TimetableControls(
             selectedDay: selectedDay,
-            days: _days,
+            days: days,
             filterMode: filterMode,
             onDayChanged: _onDayChanged,
             onFilterModeChanged: _onFilterModeChanged,
@@ -162,8 +163,8 @@ class _TimetablePageState extends State<TimetablePage> {
                           ),
                           const SizedBox(height: 10),
                           // Mode filtré (mes favoris OU équipe) → vue plate,
-                          // district affiché sur la tuile.
-                          // Mode normal → vue par district (lignes séparées).
+                          // scène affichée sur la tuile.
+                          // Mode normal → vue par scène (lignes séparées).
                           isFiltered
                               ? TimetableFavoritesView(
                                   items: displayItems,
@@ -172,7 +173,7 @@ class _TimetablePageState extends State<TimetablePage> {
                                   onToggleFavorite: _toggleFavorite,
                                   onTap: _onDjCardTap,
                                 )
-                              : TimetableDistrictView(
+                              : TimetableStageView(
                                   items: displayItems,
                                   totalWidth: totalWidth,
                                   minStartTime: minStartTime,

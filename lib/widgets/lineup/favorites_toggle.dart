@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class FavoritesToggle extends StatelessWidget {
@@ -23,7 +24,7 @@ class FavoritesToggle extends StatelessWidget {
           child: Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: const Color(0xFF7851A9),
+            activeThumbColor: AppTheme.accent,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),

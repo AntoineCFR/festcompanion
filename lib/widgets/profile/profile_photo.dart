@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
@@ -67,7 +68,7 @@ class _ProfilePhotoState extends State<ProfilePhoto> {
             children: [
               CircleAvatar(
                 radius: 50,
-                backgroundColor: Colors.grey[800],
+                backgroundColor: AppTheme.surface,
                 backgroundImage: snapshot.hasData
                     ? CachedNetworkImageProvider(snapshot.data!)
                     : null,

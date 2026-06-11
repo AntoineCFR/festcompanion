@@ -3,14 +3,15 @@ import 'package:intl/intl.dart';
 class TimetableItem {
   final int setId;
   final String dj;
-  final String district;
-  final String stage;
+  final String stage;   // lieu géolocalisé (ex-"district")
+  final String host;    // collectif qui anime la scène (ex-"stage")
   final String day;
   final int dayInt;
+  final int? stageOrder;  // ordre d'affichage de la scène (null = fallback alpha)
   final DateTime startTime;
   final DateTime endTime;
   bool isFavorite;
-  int? notation;  // ← NOUVEAU
+  int? notation;
   final String? bio;
   final String? spotifyLink;
   final String? soundcloudLink;
@@ -19,14 +20,15 @@ class TimetableItem {
   TimetableItem({
     required this.setId,
     required this.dj,
-    required this.district,
     required this.stage,
+    required this.host,
     required this.day,
     required this.dayInt,
+    this.stageOrder,
     required this.startTime,
     required this.endTime,
     this.isFavorite = false,
-    this.notation,  // ← NOUVEAU
+    this.notation,
     this.bio,
     this.spotifyLink,
     this.soundcloudLink,
@@ -38,14 +40,15 @@ class TimetableItem {
     return {
       'set_id': setId,
       'dj': dj,
-      'district': district,
       'stage': stage,
+      'host': host,
       'day': day,
       'day_int': dayInt,
+      'stage_order': stageOrder,
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
       'is_favorite': isFavorite,
-      'notation': notation,  // ← NOUVEAU
+      'notation': notation,
       'bio': bio,
       'spotify_link': spotifyLink,
       'soundcloud_link': soundcloudLink,
@@ -73,18 +76,36 @@ class TimetableItem {
     return TimetableItem(
       setId: json['set_id'] ?? json['setId'] ?? 0,
       dj: json['dj'] ?? '',
-      district: json['district'] ?? '',
       stage: json['stage'] ?? '',
+      host: json['host'] ?? '',
       day: json['day'] ?? '',
       dayInt: json['day_int'] ?? json['dayInt'] ?? 0,
+      stageOrder: json['stage_order'] ?? json['stageOrder'],
       startTime: parseDateTime(json['start_time'] ?? json['startTime']),
       endTime: parseDateTime(json['end_time'] ?? json['endTime']),
       isFavorite: json['is_favorite'] ?? json['isFavorite'] ?? false,
-      notation: json['notation'] as int?,  // ← NOUVEAU
+      notation: json['notation'] as int?,
       bio: json['bio'],
       spotifyLink: json['spotify_link'] ?? json['spotifyLink'],
       soundcloudLink: json['soundcloud_link'] ?? json['soundcloudLink'],
       instagramLink: json['instagram_link'] ?? json['instagramLink'],
     );
+  }
+
+  /// Ordre d'affichage des scènes :
+  /// - par `stageOrder` (ordre voulu du festival, fourni par le scraper) si dispo ;
+  /// - sinon repli alphabétique INSENSIBLE à la casse (ex. anciennes données
+  ///   sans stage_order), ce qui évite que les noms en MAJUSCULES remontent en tête.
+  static int compareByStage(TimetableItem a, TimetableItem b) {
+    final ao = a.stageOrder;
+    final bo = b.stageOrder;
+    if (ao != null && bo != null) {
+      if (ao != bo) return ao.compareTo(bo);
+    } else if (ao != null) {
+      return -1;
+    } else if (bo != null) {
+      return 1;
+    }
+    return a.stage.toLowerCase().compareTo(b.stage.toLowerCase());
   }
 }

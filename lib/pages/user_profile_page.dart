@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../models/timetable_item.dart';
@@ -57,10 +58,10 @@ class UserProfilePage extends StatelessWidget {
     final hasKnownLocation = user.lastLocation != '?';
 
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: Text(user.username),
-        backgroundColor: Colors.grey[800],
+        backgroundColor: AppTheme.surface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -155,7 +156,6 @@ class _InfoRow extends StatelessWidget {
   final VoidCallback? onAction;
 
   const _InfoRow({
-    super.key,
     required this.icon,
     required this.label,
     required this.available,
@@ -195,13 +195,13 @@ class _FavoriteSetTile extends StatelessWidget {
   final TimetableItem item;
   final int? notation;
 
-  const _FavoriteSetTile({super.key, required this.item, required this.notation});
+  const _FavoriteSetTile({required this.item, required this.notation});
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.grey[800],
+      color: AppTheme.surface,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => Navigator.push(
@@ -213,7 +213,7 @@ class _FavoriteSetTile extends StatelessWidget {
               dj: DJ(
                 name: item.dj,
                 bio: item.bio ?? '',
-                district: item.district,
+                stage: item.stage,
                 startTime: item.startTime,
                 endTime: item.endTime,
                 spotifyLink: item.spotifyLink,
@@ -235,10 +235,10 @@ class _FavoriteSetTile extends StatelessWidget {
                   width: 48,
                   height: 48,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     width: 48,
                     height: 48,
-                    color: Colors.grey[700],
+                    color: AppTheme.surfaceAlt,
                     child: const Icon(Icons.person, color: Colors.white54, size: 24),
                   ),
                 ),
@@ -259,7 +259,7 @@ class _FavoriteSetTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${item.district} · '
+                      '${item.stage} · '
                       '${AppUtils.formatTime(item.startTime)} – '
                       '${AppUtils.formatTime(item.endTime)}',
                       style: const TextStyle(color: Colors.white54, fontSize: 13),

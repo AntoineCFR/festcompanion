@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
-import 'splash_login.dart'; // ✅ Import ajouté pour SplashLogin
+import 'festival_selection_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -42,11 +42,11 @@ class _LoginPageState extends State<LoginPage> {
         await AuthService.saveLogin(username, userId);
 
         if (!mounted) return;
-        // ✅ Redirige vers SplashLogin (au lieu de MainScreen)
+        // ✅ Redirige vers FestivalGate (sélection festival → données → session)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => SplashLogin(
+            builder: (context) => FestivalGate(
               userId: userId,
               username: username,
             ),

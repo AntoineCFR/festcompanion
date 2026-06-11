@@ -1,9 +1,9 @@
+import '../theme/app_theme.dart';
 // lib/pages/splash_screen.dart
 import 'package:flutter/material.dart';
-import '../services/app_data_manager.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
-import 'splash_login.dart';
+import 'festival_selection_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.background,
       body: FutureBuilder<Map<String, dynamic>?>(
         future: AuthService.getSavedLogin(),
         builder: (context, savedUserSnapshot) {
@@ -99,81 +99,33 @@ class _SplashScreenState extends State<SplashScreen> {
             );
           }
 
-          // ✅ Charge TOUTES les données (timetable + utilisateurs + TOUS les favoris)
-          return FutureBuilder(
-            future: AppDataManager().loadAllData(),
-            builder: (context, dataSnapshot) {
-              if (dataSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 20),
-                      Text(
-                        'Chargement des données...',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ],
+          // ✅ Utilisateur connu → FestivalGate (sélection festival si besoin,
+          //    puis chargement des données globales, puis SplashLogin).
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => FestivalGate(
+                    userId: savedUser['userId'] as int,
+                    username: savedUser['username'] as String,
                   ),
-                );
-              }
-
-              if (dataSnapshot.hasError) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    _showSnackBar('Erreur de chargement : ${dataSnapshot.error}');
-                  }
-                });
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error, color: Colors.red, size: 40),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Impossible de charger les données',
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () => setState(() {}),
-                        child: const Text('Réessayer'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              // ✅ Redirige vers SplashLogin (les favoris sont déjà chargés)
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => SplashLogin(
-                        userId: savedUser['userId'] as int,
-                        username: savedUser['username'] as String,
-                      ),
-                    ),
-                  );
-                }
-              });
-
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 20),
-                    Text(
-                      'Prêt !',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ],
                 ),
               );
-            },
+            }
+          });
+
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 20),
+                Text(
+                  'Prêt !',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ],
+            ),
           );
         },
       ),

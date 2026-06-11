@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../models/event_model.dart';
 
@@ -162,7 +163,7 @@ class EventWheel extends StatelessWidget {
       onTap: () => onEventSelected(item.type),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey[850],
+          color: AppTheme.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
           border: isSos
               ? Border.all(color: Colors.red[400]!, width: 1.5)

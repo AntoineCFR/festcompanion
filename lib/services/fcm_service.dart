@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'app_data_manager.dart';
+import '../helpers/profile_helper.dart';
 
 /// Centralise l'initialisation FCM et l'affichage des notifications.
 ///
@@ -57,6 +58,39 @@ class FcmService {
 
     // Écoute les messages FCM reçus quand l'app est au premier plan.
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+
+    // Quand l'utilisateur TAPE une notification (app en fond) → on traite
+    // la demande de position. C'est le chemin fiable sur iOS.
+    FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpened);
+
+    // App lancée depuis l'état terminé en tapant une notification.
+    final initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      _onMessageOpened(initialMessage);
+    }
+  }
+
+  /// Une alerte "perdu" (ou un flag explicite) demande à chacun de remonter
+  /// sa position. On ne le fait que si l'app est active/ouverte (pas de
+  /// localisation en arrière-plan) et si le partage est activé.
+  static bool _wantsLocation(RemoteMessage message) {
+    return message.data['request_location'] == 'true' ||
+        message.data['event_type'] == 'perdu';
+  }
+
+  static Future<void> _reportLocationIfRequested(RemoteMessage message) async {
+    if (!_wantsLocation(message)) return;
+    final userId = AppDataManager().userId;
+    if (userId != null) {
+      await ProfileHelper.refreshLocationIfEnabled(userId);
+    }
+  }
+
+  static void _onMessageOpened(RemoteMessage message) {
+    _reportLocationIfRequested(message);
+    if (message.data['event_type'] == 'perdu') {
+      AppDataManager().loadUsers().ignore();
+    }
   }
 
   static Future<void> _initLocalNotifications() async {
@@ -77,8 +111,12 @@ class FcmService {
     final eventType = message.data['event_type'] ?? '';
 
     // ── Logique métier ────────────────────────────────────────────────────────
-    // Quand quelqu'un se déclare "perdu", le backend met à jour les districts
-    // → on rafraîchit la liste des utilisateurs pour l'afficher à jour.
+    // Si une MAJ de position est demandée (alerte "perdu"), on remonte la nôtre
+    // (app au premier plan → fix possible sans permission background).
+    await _reportLocationIfRequested(message);
+
+    // Quand quelqu'un se déclare "perdu", on rafraîchit la liste des utilisateurs
+    // pour afficher les positions à jour.
     if (eventType == 'perdu') {
       AppDataManager().loadUsers().ignore();
     }

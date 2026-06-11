@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class MainBottomNavBar extends StatelessWidget {
@@ -16,7 +17,7 @@ class MainBottomNavBar extends StatelessWidget {
       currentIndex: currentIndex,
       onTap: onTap,
       type: BottomNavigationBarType.fixed,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.background,
       selectedItemColor: Colors.white,
       unselectedItemColor: Colors.white38,
       selectedFontSize: 12,

@@ -40,9 +40,9 @@ class _DJProfilePageState extends State<DJProfilePage> {
         child: Column(
           children: [
             DJProfileHeader(
-              imagePath: AppUtils.getDjImagePath(widget.dj.name),
+              imagePaths: AppUtils.getDjImagePaths(widget.dj.name),
               name: widget.dj.name,
-              district: widget.dj.district,
+              stage: widget.dj.stage,
               startTime: widget.dj.startTime,
               endTime: widget.dj.endTime,
               isFavorite: isFavorite,

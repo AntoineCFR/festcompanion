@@ -1,8 +1,10 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../models/timetable_item.dart';
 import '../../widgets/favorite_star.dart';
 import '../ratings/rating_text.dart';
 import '../shared/fan_avatars_row.dart';
+import '../shared/dj_photo.dart';
 import '../../utils/utils.dart';
 import '../../services/app_data_manager.dart';
 
@@ -24,7 +26,7 @@ class DJListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: isFavorite ? const Color(0xFF7851A9) : null,
+      color: isFavorite ? AppTheme.accent : null,
       child: InkWell(
         onTap: onTap, // ✅ MODIFIÉ : Utilise le callback passé (ou null)
         child: Padding(
@@ -40,12 +42,7 @@ class DJListTile extends StatelessWidget {
                     height: 48,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4.0),
-                      child: Image.asset(
-                        AppUtils.getDjImagePath(item.dj),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.person, color: Colors.white54),
-                      ),
+                      child: DjPhoto(djName: item.dj),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -70,7 +67,7 @@ class DJListTile extends StatelessWidget {
                         if (AppDataManager().showFavoritesOnly ||
                             AppDataManager().showAllUsersFavorites)
                           Text(
-                            item.district,
+                            item.stage,
                             style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 12,

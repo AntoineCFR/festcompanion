@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class DaySelector extends StatelessWidget {
@@ -13,7 +14,15 @@ class DaySelector extends StatelessWidget {
   });
 
   String _shortName(String day) {
-    switch (day) {
+    switch (day.toLowerCase()) {
+      case 'monday':
+        return 'Lun.';
+      case 'tuesday':
+        return 'Mar.';
+      case 'wednesday':
+        return 'Mer.';
+      case 'thursday':
+        return 'Jeu.';
       case 'friday':
         return 'Ven.';
       case 'saturday':
@@ -34,9 +43,9 @@ class DaySelector extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       color: Colors.white54,
       selectedColor: Colors.white,
-      fillColor: const Color(0xFF7851A9),
+      fillColor: AppTheme.accent,
       borderColor: Colors.white24,
-      selectedBorderColor: const Color(0xFF7851A9),
+      selectedBorderColor: AppTheme.accent,
       children: days
           .map((day) => Text(_shortName(day),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))

@@ -2,17 +2,23 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/weather_model.dart';
+import 'api_service.dart';
 
 class WeatherService {
-  static const String _weatherUrl = 'https://extremalineup.onrender.com/weather';
-  static const String _cacheKey = 'cached_weather';
+  static const String _weatherBaseUrl = 'https://extremalineup.onrender.com/weather';
   static const String _cacheTimestampKey = 'cached_weather_timestamp';
   static const Duration _cacheDuration = Duration(hours: 1);
 
+  // Cache namespacé par festival pour éviter tout mélange entre festivals.
+  String get _cacheKey => 'cached_weather_${ApiService.currentFestivalId ?? 0}';
+
   Future<List<WeatherForecast>?> getWeatherForecast() async {
+    final festivalId = ApiService.currentFestivalId;
+    if (festivalId == null) return null;
     try {
       // 1. Essaye de récupérer depuis le serveur
-      final response = await http.get(Uri.parse(_weatherUrl)).timeout(const Duration(seconds: 30));
+      final url = Uri.parse('$_weatherBaseUrl?festival_id=$festivalId');
+      final response = await http.get(url).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);

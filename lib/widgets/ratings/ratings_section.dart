@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../services/app_data_manager.dart';
@@ -215,7 +216,7 @@ class _UserFanChip extends StatelessWidget {
       child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.grey[800],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

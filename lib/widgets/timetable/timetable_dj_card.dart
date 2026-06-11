@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../models/timetable_item.dart';
 import '../../models/dj_model.dart';
@@ -5,6 +6,7 @@ import '../../models/user_model.dart';
 import '../../widgets/favorite_star.dart';
 import '../ratings/rating_text.dart';
 import '../shared/fan_avatars_row.dart';
+import '../shared/dj_photo.dart';
 import '../../utils/utils.dart';
 import '../../pages/djprofilepage.dart';
 import '../../services/app_data_manager.dart';
@@ -18,9 +20,9 @@ class TimetableDjCard extends StatelessWidget {
   final double height;
   final VoidCallback? onTap;
 
-  /// Affiche le nom du district sous le nom du DJ (utile en vue "favoris"
-  /// où les sets de districts différents sont mélangés sur la même ligne).
-  final bool showDistrict;
+  /// Affiche le nom de la scène sous le nom du DJ (utile en vue "favoris"
+  /// où les sets de scènes différentes sont mélangés sur la même ligne).
+  final bool showStage;
 
   const TimetableDjCard({
     super.key,
@@ -30,7 +32,7 @@ class TimetableDjCard extends StatelessWidget {
     required this.width,
     required this.height,
     this.onTap,
-    this.showDistrict = false,
+    this.showStage = false,
   });
 
   @override
@@ -53,7 +55,7 @@ class TimetableDjCard extends StatelessWidget {
                 dj: DJ(
                   name: item.dj,
                   bio: item.bio ?? '',
-                  district: item.district,
+                  stage: item.stage,
                   startTime: item.startTime,
                   endTime: item.endTime,
                   spotifyLink: item.spotifyLink,
@@ -66,7 +68,7 @@ class TimetableDjCard extends StatelessWidget {
         },
         child: Card(
           margin: TimetableConstants.cardMargin,
-          color: isFavorite ? const Color(0xFF7851A9) : null,
+          color: isFavorite ? AppTheme.accent : null,
           child: Padding(
             padding: TimetableConstants.cardPadding,
             child: Row(
@@ -79,12 +81,7 @@ class TimetableDjCard extends StatelessWidget {
                     width: TimetableConstants.photoWidth,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4.0),
-                      child: Image.asset(
-                        AppUtils.getDjImagePath(item.dj),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.person, color: Colors.white54, size: 20),
-                      ),
+                      child: DjPhoto(djName: item.dj),
                     ),
                   ),
                 if (width >= 60) const SizedBox(width: 8),
@@ -117,10 +114,10 @@ class TimetableDjCard extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  if (showDistrict)
+                                  if (showStage)
                                     Text(
-                                      item.district,
-                                      style: TimetableConstants.districtSubtitleStyle,
+                                      item.stage,
+                                      style: TimetableConstants.stageSubtitleStyle,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),

@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
 import '../models/dj_model.dart';
@@ -23,7 +24,6 @@ class LineupPage extends StatefulWidget {
 }
 
 class _LineupPageState extends State<LineupPage> {
-  final List<String> _days = const ['friday', 'saturday', 'sunday'];
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -55,7 +55,7 @@ class _LineupPageState extends State<LineupPage> {
           dj: DJ(
             name: item.dj,
             bio: item.bio ?? '',
-            district: item.district,
+            stage: item.stage,
             startTime: item.startTime,
             endTime: item.endTime,
             spotifyLink: item.spotifyLink,
@@ -89,6 +89,7 @@ class _LineupPageState extends State<LineupPage> {
     final favoriteSetIds = AppDataManager().favoriteSetIds;
     final allFavoriteSetIds = AppDataManager().allUsersFavoriteSetIds;
     final timetable = AppDataManager().timetable;
+    final days = AppDataManager().festivalDays;
     final isFiltered = filterMode != FavoriteFilterMode.normal;
 
     final displayItems = LineupHelper.filterAndSortTimetable(
@@ -101,12 +102,12 @@ class _LineupPageState extends State<LineupPage> {
     );
 
     return Container(
-      color: Colors.grey[900],
+      color: AppTheme.background,
       child: Column(
         children: [
           LineupHeader(
             selectedDay: selectedDay,
-            days: _days,
+            days: days,
             filterMode: filterMode,
             onDayChanged: _onDayChanged,
             onFilterModeChanged: _onFilterModeChanged,
@@ -129,11 +130,11 @@ class _LineupPageState extends State<LineupPage> {
                         .toList(),
                   )
                 else
-                  // Mode normal : regroupé par district
+                  // Mode normal : regroupé par scène
                   Column(
-                    children: LineupHelper.groupByDistrict(displayItems)
+                    children: LineupHelper.groupByStage(displayItems)
                         .entries
-                        .map((districtEntry) => Column(
+                        .map((stageEntry) => Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Padding(
@@ -142,7 +143,7 @@ class _LineupPageState extends State<LineupPage> {
                                     vertical: 8,
                                   ),
                                   child: Text(
-                                    districtEntry.key,
+                                    stageEntry.key,
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w600,
@@ -150,7 +151,7 @@ class _LineupPageState extends State<LineupPage> {
                                     ),
                                   ),
                                 ),
-                                ...districtEntry.value.map(
+                                ...stageEntry.value.map(
                                   (item) => DJListTile(
                                     item: item,
                                     isFavorite: favoriteSetIds.contains(item.setId),

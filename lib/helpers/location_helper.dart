@@ -95,22 +95,6 @@ class LocationHelper {
     await prefs.setBool(_locationEnabledKey, value);
   }
 
-  // ========== BACKGROUND PERMISSION ==========
-
-  /// Vérifie si la permission de localisation en arrière-plan est accordée.
-  /// Si non, ouvre les paramètres système pour que l'utilisateur puisse
-  /// sélectionner « Tout le temps » (Android 11+ impose ce passage par les réglages).
-  /// Retourne true si la permission est déjà « always », false sinon.
-  static Future<bool> requestBackgroundPermission() async {
-    final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.always) return true;
-
-    // Ouvre les paramètres de l'app pour que l'utilisateur autorise
-    // "Autoriser tout le temps" (obligatoire sur Android 11+).
-    await Geolocator.openAppSettings();
-    return false;
-  }
-
   // ========== GOOGLE MAPS ==========
 
   /// Ouvre Google Maps avec des coordonnées
@@ -136,7 +120,27 @@ class LocationHelper {
     }
   }
 
-  /// Ouvre le parking du festival dans Google Maps
+  /// Ouvre Google Maps sur une requête libre : adresse ("Leisenweg, Hilvarenbeek")
+  /// ou coordonnées ("51.02,5.44"). Utilisé pour le parking propre à chaque festival.
+  static Future<bool> openMapsQuery(
+    String query, {
+    LaunchMode mode = LaunchMode.externalApplication,
+  }) async {
+    final url =
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}';
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: mode);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Erreur Google Maps (query): $e');
+      return false;
+    }
+  }
+
+  /// Ouvre le parking du festival dans Google Maps (fallback Extrema codé en dur)
   static Future<bool> openFestivalLocation() async {
     return await openInGoogleMaps(
       latitude: festivalLatitude,

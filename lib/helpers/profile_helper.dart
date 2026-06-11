@@ -22,7 +22,7 @@ class ProfileHelper {
     );
   }
 
-  // Rafraîchissement de la localisation + district
+  // Rafraîchissement de la localisation + scène
   static Future<void> refreshLocation(int userId) async {
     final position = await LocationHelper.getCurrentPosition();
 
@@ -33,14 +33,39 @@ class ProfileHelper {
       lng: position.longitude,
     );
 
-    // Met à jour le modèle local avec le district
-    final district = response['district'] as String?;
+    // Met à jour le modèle local avec la scène
+    final stage = response['stage'] as String?;
     AppDataManager().updateUserLocation(
       userId,
       position.latitude,
       position.longitude,
-      district: district,
+      stage: stage,
     );
+  }
+
+  /// Rafraîchit la position SI l'utilisateur a activé le partage, sans jamais
+  /// lever d'exception (échec silencieux). Utilisé à l'ouverture de l'app et
+  /// sur réception d'une demande "perdu". Respecte le consentement de partage.
+  static Future<void> refreshLocationIfEnabled(int userId) async {
+    try {
+      if (!await LocationHelper.isLocationEnabled()) return;
+      final position = await LocationHelper.tryGetCurrentPosition();
+      if (position == null) return;
+      final response = await ApiService.updateGeoloc(
+        userId: userId,
+        lat: position.latitude,
+        lng: position.longitude,
+      );
+      final stage = response['stage'] as String?;
+      AppDataManager().updateUserLocation(
+        userId,
+        position.latitude,
+        position.longitude,
+        stage: stage,
+      );
+    } catch (_) {
+      // Best-effort : on n'interrompt rien si la position n'est pas dispo.
+    }
   }
 
   // Sauvegarde du numéro de téléphone

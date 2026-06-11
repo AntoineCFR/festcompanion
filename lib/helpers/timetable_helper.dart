@@ -38,10 +38,10 @@ class TimetableHelper {
         if (startCompare != 0) return startCompare;
         int endCompare = a.endTime.compareTo(b.endTime);
         if (endCompare != 0) return endCompare;
-        return a.district.compareTo(b.district);
+        return TimetableItem.compareByStage(a, b);
       } else {
-        int districtCompare = a.district.compareTo(b.district);
-        if (districtCompare != 0) return districtCompare;
+        int stageCompare = TimetableItem.compareByStage(a, b);
+        if (stageCompare != 0) return stageCompare;
         return a.startTime.compareTo(b.startTime);
       }
     });

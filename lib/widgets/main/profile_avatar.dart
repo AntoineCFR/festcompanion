@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../services/app_data_manager.dart';
@@ -73,7 +74,7 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
             padding: const EdgeInsets.all(8.0),
             child: CircleAvatar(
               radius: 20,
-              backgroundColor: Colors.grey[800],
+              backgroundColor: AppTheme.surface,
               backgroundImage: photoUrl != null
                   ? CachedNetworkImageProvider(photoUrl)
                   : null,

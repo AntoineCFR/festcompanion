@@ -1,7 +1,9 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/app_data_manager.dart';
 import '../helpers/team_helper.dart';
+import '../helpers/profile_helper.dart';
 import '../widgets/team/team_list.dart';
 import 'user_profile_page.dart';
 
@@ -23,6 +25,11 @@ class _TeamPageState extends State<TeamPage> {
 
   Future<void> _loadData() async {
     try {
+      // Rafraîchit ma propre position (si partage activé) avant d'afficher l'équipe.
+      final myId = AppDataManager().userId;
+      if (myId != null) {
+        await ProfileHelper.refreshLocationIfEnabled(myId);
+      }
       await AppDataManager().loadUsers();
     } catch (e) {
       if (mounted) AppDataManager().showSnackBar('Erreur chargement équipe : $e');
@@ -36,10 +43,10 @@ class _TeamPageState extends State<TeamPage> {
     final users = AppDataManager().users;
 
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('Équipe'),
-        backgroundColor: Colors.grey[800],
+        backgroundColor: AppTheme.surface,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

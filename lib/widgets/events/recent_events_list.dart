@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../models/event_model.dart';
 
@@ -92,7 +93,7 @@ class _EventTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.grey[850],
+          color: AppTheme.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -102,7 +103,7 @@ class _EventTile extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 18),

@@ -1,3 +1,4 @@
+import '../../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../models/weather_model.dart';
 import '../../../utils/utils.dart';
@@ -16,9 +17,9 @@ class WeatherCard extends StatelessWidget {
       width: 100,
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.grey[800],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[700]!),
+        border: Border.all(color: AppTheme.surfaceAlt),
       ),
       child: Stack(
         children: [

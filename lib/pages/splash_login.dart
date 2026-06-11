@@ -1,8 +1,9 @@
+import '../theme/app_theme.dart';
 // lib/pages/splash_login.dart
 import 'package:flutter/material.dart';
 import '../services/app_data_manager.dart';
-import '../services/geoloc_background_service.dart';
 import '../services/fcm_service.dart';
+import '../helpers/profile_helper.dart';
 import 'main_screen.dart';
 
 class SplashLogin extends StatefulWidget {
@@ -31,14 +32,14 @@ class _SplashLoginState extends State<SplashLogin> {
   }
 
   /// Charge les données de session :
-  /// 1. Favoris et événements de l'utilisateur
-  /// 2. Sauvegarde de l'userId pour le background isolate WorkManager
-  /// 3. Initialisation de WorkManager (reprend la planification si elle était active)
+  /// 1. Favoris de l'utilisateur
+  /// 2. Initialisation FCM (permissions + écouteurs de notifications)
+  /// 3. MAJ de position à l'ouverture (best-effort, si le partage est activé)
   Future<void> _init() async {
     await AppDataManager().loadFavorites(widget.userId);
-    await GeolocBackgroundService.saveUserId(widget.userId);
-    await GeolocBackgroundService.init();
-    await FcmService.init(); // permission + abonnement topic "all_users"
+    await FcmService.init();
+    // Fire-and-forget : ne bloque pas l'entrée dans l'app.
+    ProfileHelper.refreshLocationIfEnabled(widget.userId);
   }
 
   @override
@@ -48,7 +49,7 @@ class _SplashLoginState extends State<SplashLogin> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            backgroundColor: Colors.grey[900],
+            backgroundColor: AppTheme.background,
             body: const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -83,7 +84,7 @@ class _SplashLoginState extends State<SplashLogin> {
         }
 
         return Scaffold(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.background,
           body: const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
