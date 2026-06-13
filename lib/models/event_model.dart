@@ -19,6 +19,12 @@ class Event {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'user_id': userId,
+        'timestamp': timestamp.toIso8601String(),
+        'event_type': eventType,
+      };
+
   // Constantes pour les types d'événements
   static const List<String> alcoholTypes = ['demi_alcool', 'alcool'];
   static const List<String> energyTypes = ['quart_energie', 'demi_energie', 'pleine_energie'];

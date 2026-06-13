@@ -1,8 +1,8 @@
-import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
 import '../models/dj_model.dart';
 import '../services/app_data_manager.dart';
+import '../widgets/shared/festival_background.dart';
 import '../widgets/timetable/timetable_controls.dart';
 import '../widgets/timetable/empty_timetable_state.dart';
 import '../widgets/timetable/time_scale.dart';
@@ -105,8 +105,8 @@ class _TimetablePageState extends State<TimetablePage> {
     );
 
     if (displayItems.isEmpty) {
-      return Container(
-        color: AppTheme.background,
+      return FestivalBackground(
+        imageKey: 'featured',
         child: EmptyTimetableState(
           days: days,
           selectedDay: selectedDay,
@@ -122,8 +122,8 @@ class _TimetablePageState extends State<TimetablePage> {
     final totalWidth = maxEndTime.difference(minStartTime).inMinutes * 3.0;
     final offsetInPixels = TimetableHelper.calculateOffset(minStartTime);
 
-    return Container(
-      color: AppTheme.background,
+    return FestivalBackground(
+      imageKey: 'featured',
       child: Column(
         children: [
           TimetableControls(

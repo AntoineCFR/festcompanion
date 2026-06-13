@@ -4,6 +4,7 @@ import '../widgets/dj_profile/dj_profile_header.dart';
 import '../widgets/dj_profile/dj_bio.dart';
 import '../widgets/dj_profile/social_media_links.dart';
 import '../widgets/ratings/ratings_section.dart';
+import '../widgets/tags/tags_section.dart';
 import '../helpers/social_media_helper.dart';
 import '../utils/utils.dart';
 import '../services/app_data_manager.dart';
@@ -56,10 +57,22 @@ class _DJProfilePageState extends State<DJProfilePage> {
               SocialMediaLinks(items: socialMediaItems),
               const SizedBox(height: 16),
             ],
-            RatingsSection(
-              userId: widget.userId,
-              setId: widget.setId,
-              onRatingChanged: () => setState(() {}), // ✅ NOUVEAU : Rafraîchit l'UI après notation
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: TagsSection(
+                userId: widget.userId,
+                setId: widget.setId,
+                onChanged: () => setState(() {}),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: RatingsSection(
+                userId: widget.userId,
+                setId: widget.setId,
+                onRatingChanged: () => setState(() {}), // ✅ NOUVEAU : Rafraîchit l'UI après notation
+              ),
             ),
             const SizedBox(height: 16),
             const Padding(

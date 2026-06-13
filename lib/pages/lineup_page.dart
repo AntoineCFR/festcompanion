@@ -1,8 +1,8 @@
-import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/timetable_item.dart';
 import '../models/dj_model.dart';
 import '../services/app_data_manager.dart';
+import '../widgets/shared/festival_background.dart';
 import '../widgets/lineup/lineup_header.dart';
 import '../widgets/lineup/dj_list_tile.dart';
 import '../widgets/lineup/empty_lineup_state.dart';
@@ -101,8 +101,8 @@ class _LineupPageState extends State<LineupPage> {
       allFavoriteSetIds: allFavoriteSetIds.toList(),
     );
 
-    return Container(
-      color: AppTheme.background,
+    return FestivalBackground(
+      imageKey: 'featured',
       child: Column(
         children: [
           LineupHeader(

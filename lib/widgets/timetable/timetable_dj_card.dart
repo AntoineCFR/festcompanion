@@ -41,6 +41,22 @@ class TimetableDjCard extends StatelessWidget {
         ? AppDataManager().getUsersWhoFavorited(item.setId)
         : const [];
 
+    // Largeur réellement disponible (hors marges/padding de la Card).
+    // La photo (48) et l'encadré note (~44) sont de largeur FIXE → sur un set
+    // court (tuile étroite) ils déborderaient. On les masque progressivement
+    // quand il n'y a pas la place ; le nom (Expanded) reste et tronque.
+    final double contentW = width - 20;
+    final bool showStar = contentW >= 28;
+    final bool showPhoto = contentW >= 88; // photo + étoile
+    final bool showRating = showStar && contentW >= (showPhoto ? 60 : 0) + 48;
+
+    final List<Widget> rightChildren = [
+      if (showStar)
+        FavoriteStar(isFavorite: isFavorite, onPressed: onToggleFavorite),
+      if (showRating)
+        RatingText(rating: AppDataManager().getUserFavorite(item.setId)?.notation),
+    ];
+
     return SizedBox(
       width: width,
       height: height,
@@ -69,25 +85,23 @@ class TimetableDjCard extends StatelessWidget {
         child: Card(
           margin: TimetableConstants.cardMargin,
           color: isFavorite ? AppTheme.accent : null,
-          child: Padding(
-            padding: TimetableConstants.cardPadding,
-            child: Row(
-              // La photo et la colonne droite s'étirent sur toute la hauteur.
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Photo DJ : largeur fixe, pleine hauteur ───────────────────
-                if (width >= 60)
-                  SizedBox(
-                    width: TimetableConstants.photoWidth,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4.0),
-                      child: DjPhoto(djName: item.dj),
-                    ),
-                  ),
-                if (width >= 60) const SizedBox(width: 8),
+          // La Card découpe la photo flush à son bord arrondi (look « Tendances »).
+          clipBehavior: Clip.antiAlias,
+          child: Row(
+            // La photo et la colonne droite s'étirent sur toute la hauteur.
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Photo DJ : largeur fixe, flush à gauche, PLEINE HAUTEUR ──────
+              if (showPhoto)
+                SizedBox(
+                  width: TimetableConstants.photoWidth,
+                  child: DjPhoto(djName: item.dj),
+                ),
 
-                // ── Colonne droite : [infos + étoile] en haut, fans en bas ────
-                Expanded(
+              // ── Colonne droite : [infos + étoile] en haut, fans en bas ────
+              Expanded(
+                child: Padding(
+                  padding: TimetableConstants.cardPadding,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -124,21 +138,14 @@ class TimetableDjCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            // Étoile + note
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                FavoriteStar(
-                                  isFavorite: isFavorite,
-                                  onPressed: onToggleFavorite,
-                                ),
-                                RatingText(
-                                  rating: AppDataManager()
-                                      .getUserFavorite(item.setId)
-                                      ?.notation,
-                                ),
-                              ],
-                            ),
+                            // Étoile + note (masquées si la tuile est trop étroite)
+                            if (rightChildren.isNotEmpty) ...[
+                              const SizedBox(width: 4),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: rightChildren,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -151,8 +158,8 @@ class TimetableDjCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -32,7 +32,7 @@ class UserActionButtons extends StatelessWidget {
           onPressed: canCall ? () => onCallPressed(phoneNumber!) : null,
         ),
         IconButton(
-          icon: Icon(Icons.near_me, size: 22,
+          icon: Icon(Icons.place, size: 22,
               color: canLocate ? Colors.white : Colors.white24),
           constraints: const BoxConstraints(),
           padding: const EdgeInsets.only(left: 6, right: 0),

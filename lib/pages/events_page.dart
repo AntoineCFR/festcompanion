@@ -2,9 +2,11 @@ import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 import '../services/app_data_manager.dart';
+import '../helpers/profile_helper.dart';
 import '../widgets/events/event_wheel.dart';
 import '../widgets/events/recent_events_list.dart';
 import '../widgets/events/sos_hold_button.dart';
+import '../widgets/shared/festival_background.dart';
 
 class EventsPage extends StatefulWidget {
   final String username;
@@ -20,20 +22,46 @@ class EventsPage extends StatefulWidget {
   State<EventsPage> createState() => _EventsPageState();
 }
 
-class _EventsPageState extends State<EventsPage> {
+class _EventsPageState extends State<EventsPage>
+    with AutomaticKeepAliveClientMixin {
   bool _isLoading = true;
   // Liste LOCALE des événements (copie) : permet l'affichage optimiste
   // instantané, indépendant de la liste interne d'AppDataManager.
   List<Event> _events = [];
   bool _showingSos = false;
 
+  // Garde la page vivante dans le PageView → revenir sur l'onglet Events
+  // n'efface pas l'état et ne relance pas un chargement (fluidité).
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
+    // Seed INSTANTANÉ depuis la mémoire si déjà chargé durant la session.
+    if (AppDataManager().userEvents.isNotEmpty) {
+      _events = List.of(AppDataManager().userEvents);
+      _isLoading = false;
+    }
     _loadEvents();
   }
 
+  /// Affiche d'abord ce qu'on a (mémoire → cache disque) SANS bloquer la roue,
+  /// puis rafraîchit depuis le serveur en arrière-plan.
   Future<void> _loadEvents() async {
+    // Cache disque pour un affichage immédiat au tout premier accès (avant que
+    // le réseau réponde) sans écraser un éventuel seed mémoire déjà présent.
+    if (_events.isEmpty) {
+      final cached = await AppDataManager().getCachedUserEvents(widget.userId);
+      if (mounted && _events.isEmpty && cached.isNotEmpty) {
+        setState(() {
+          _events = cached;
+          _isLoading = false;
+        });
+      }
+    }
+
+    // Rafraîchissement réseau en arrière-plan.
     try {
       await AppDataManager().loadUserEvents(widget.userId);
       if (mounted) {
@@ -99,6 +127,11 @@ class _EventsPageState extends State<EventsPage> {
     AppDataManager().showSnackBar(message);
 
     try {
+      // Hype : on rafraîchit d'abord MA position pour que le serveur connaisse
+      // ma scène (incluse dans le push). Best-effort (gated sur le partage).
+      if (eventType == 'hype') {
+        await ProfileHelper.refreshLocationIfEnabled(widget.userId);
+      }
       await AppDataManager().createEventRemote(widget.userId, eventType);
     } catch (e) {
       if (mounted) {
@@ -127,40 +160,48 @@ class _EventsPageState extends State<EventsPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // requis par AutomaticKeepAliveClientMixin
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Événements'),
         backgroundColor: AppTheme.surface,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Roue — 3/5 de l'espace
-                Expanded(
-                  flex: 3,
-                  child: _showingSos
-                      ? SosHoldButton(
-                          onCompleted: () {
-                            setState(() => _showingSos = false);
-                            _submitEvent('sos');
-                          },
-                          onCancel: () => setState(() => _showingSos = false),
-                        )
-                      : EventWheel(onEventSelected: _handleEventSelected),
-                ),
-                const Divider(color: Colors.white12, height: 1, thickness: 1),
-                // Historique — 2/5 de l'espace
-                Expanded(
-                  flex: 2,
-                  child: RecentEventsList(
-                    events: _events,
-                    onDeleteLast: _events.isNotEmpty ? _deleteLastEvent : null,
-                  ),
-                ),
-              ],
+      // La ROUE est toujours affichée immédiatement (action principale) ; seul
+      // l'historique attend les données, et uniquement au tout premier accès
+      // (cache vide) — sinon il s'affiche instantanément.
+      body: FestivalBackground(
+        imageKey: 'featured',
+        child: Column(
+          children: [
+            // Roue — 3/5 de l'espace
+            Expanded(
+              flex: 3,
+              child: _showingSos
+                  ? SosHoldButton(
+                      onCompleted: () {
+                        setState(() => _showingSos = false);
+                        _submitEvent('sos');
+                      },
+                      onCancel: () => setState(() => _showingSos = false),
+                    )
+                  : EventWheel(onEventSelected: _handleEventSelected),
             ),
+            const Divider(color: Colors.white12, height: 1, thickness: 1),
+            // Historique — 2/5 de l'espace
+            Expanded(
+              flex: 2,
+              child: _isLoading && _events.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : RecentEventsList(
+                      events: _events,
+                      onDeleteLast:
+                          _events.isNotEmpty ? _deleteLastEvent : null,
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

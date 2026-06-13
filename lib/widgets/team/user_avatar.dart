@@ -16,6 +16,14 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Se redessine quand les photos chargées en arrière-plan deviennent dispo.
+    return ValueListenableBuilder<int>(
+      valueListenable: AppDataManager().photosRevision,
+      builder: (context, _, _) => _buildAvatar(),
+    );
+  }
+
+  Widget _buildAvatar() {
     final photoUrl = AppDataManager().photoUrls[user.id];
     if (photoUrl != null) {
       return CircleAvatar(

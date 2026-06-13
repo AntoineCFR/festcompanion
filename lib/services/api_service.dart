@@ -4,9 +4,17 @@ import '../models/timetable_item.dart';
 import '../models/user_favorite.dart';
 import '../models/stage_model.dart';
 import '../models/festival_model.dart';
+import '../models/dj_tag.dart';
 
 class ApiService {
   static const String _baseUrl = 'https://extremalineup.onrender.com';
+
+  /// Client HTTP PARTAGÉ (keep-alive) : `http.get()`/`http.post()` ouvrent et
+  /// ferment une connexion à CHAQUE appel → au démarrage, la rafale de requêtes
+  /// parallèles (timetable, users, favoris, tags, météo…) provoque autant de
+  /// handshakes TLS « froids », ce qui plombait surtout le 1er lancement. Un
+  /// client unique réutilise la connexion → beaucoup moins de latence.
+  static final http.Client _client = http.Client();
 
   /// Festival actuellement sélectionné. Défini une seule fois à la sélection
   /// du festival (et au démarrage depuis le stockage). Injecté automatiquement
@@ -25,12 +33,45 @@ class ApiService {
     return id;
   }
 
+  /// GET résilient avec réessais. Le backend est hébergé sur Render (plan
+  /// gratuit) : après une période d'inactivité il s'endort et le PREMIER appel
+  /// met plusieurs dizaines de secondes à le réveiller (timeout, ou 502/503
+  /// transitoires). Plutôt que d'échouer et de forcer un « Réessayer » manuel,
+  /// on retente automatiquement : le réveil est déclenché au 1er essai, les
+  /// suivants aboutissent. Réservé aux GET (idempotents) — jamais les écritures.
+  static Future<http.Response> _getWithRetry(
+    Uri url, {
+    int attempts = 3,
+    Duration timeout = const Duration(seconds: 12),
+  }) async {
+    Object? lastError;
+    for (var i = 0; i < attempts; i++) {
+      try {
+        final resp = await _client.get(url).timeout(timeout);
+        // 502/503/504 = passerelle/serveur en cours de réveil → on retente.
+        if (resp.statusCode == 502 ||
+            resp.statusCode == 503 ||
+            resp.statusCode == 504) {
+          lastError = Exception('HTTP ${resp.statusCode}');
+        } else {
+          return resp;
+        }
+      } catch (e) {
+        lastError = e;
+      }
+      if (i < attempts - 1) {
+        await Future.delayed(Duration(milliseconds: 700 * (i + 1)));
+      }
+    }
+    throw Exception('Serveur injoignable après $attempts tentatives ($lastError)');
+  }
+
   // ========== FESTIVALS ==========
 
   static Future<List<Festival>> fetchFestivals() async {
     try {
       final url = Uri.parse('$_baseUrl/api/festivals');
-      final response = await http.get(url).timeout(const Duration(seconds: 30));
+      final response = await _getWithRetry(url);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Festival.fromJson(json)).toList();
@@ -48,7 +89,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/timetable?festival_id=$fid');
-      final response = await http.get(url).timeout(const Duration(seconds: 30));
+      final response = await _getWithRetry(url);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -69,7 +110,7 @@ class ApiService {
   static Future<int?> checkUserExists(String username) async {
     try {
       final url = Uri.parse('$_baseUrl/users/check?username=$username');
-      final response = await http.get(url).timeout(const Duration(seconds: 30));
+      final response = await _getWithRetry(url);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -88,7 +129,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/users?festival_id=$fid');
-      final response = await http.get(url).timeout(const Duration(seconds: 30));
+      final response = await _getWithRetry(url);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -114,7 +155,7 @@ class ApiService {
   static Future<Map<String, dynamic>> updateUserPhone(int userId, String phoneNumber) async {
     try {
       final url = Uri.parse('$_baseUrl/users/$userId/phone');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'phone_number': phoneNumber}),
@@ -134,7 +175,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/users/$userId/location');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'festival_id': fid, 'lat': lat, 'lng': lng}),
@@ -160,7 +201,7 @@ class ApiService {
           ? Uri.parse('$_baseUrl/api/user-favorites?festival_id=$fid&user_id=$userId')
           : Uri.parse('$_baseUrl/api/user-favorites?festival_id=$fid');
 
-      final response = await http.get(url).timeout(const Duration(seconds: 30));
+      final response = await _getWithRetry(url);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -197,7 +238,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/user-favorites/toggle');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'festival_id': fid, 'user_id': userId, 'set_id': setId}),
@@ -218,7 +259,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/user-favorites/rate');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -237,13 +278,76 @@ class ApiService {
     }
   }
 
+  // ========== TAGS DJ ==========
+
+  /// Récupère les tags : d'un set si [setId] fourni, sinon tous ceux du festival.
+  static Future<List<DjTag>> fetchDjTags({int? setId, int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = setId != null
+          ? Uri.parse('$_baseUrl/api/dj-tags?festival_id=$fid&set_id=$setId')
+          : Uri.parse('$_baseUrl/api/dj-tags?festival_id=$fid');
+      final response = await _getWithRetry(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final list = data['tags'] as List;
+        return list.map((e) => DjTag.fromJson(e)).toList();
+      } else {
+        throw Exception('Échec fetchDjTags: Status ${response.statusCode} - Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Échec du chargement des tags: $e');
+    }
+  }
+
+  /// Ajoute un tag. Retourne le tag tel que normalisé par le serveur.
+  static Future<String> addDjTag(int userId, int setId, String tag, {int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/api/dj-tags');
+      final response = await _client.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId, 'set_id': setId, 'tag': tag}),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return (data['tag'] ?? tag).toString();
+      } else {
+        throw Exception('Échec addDjTag: Status ${response.statusCode} - Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Échec de l\'ajout du tag: $e');
+    }
+  }
+
+  static Future<void> deleteDjTag(int userId, int setId, String tag, {int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/api/dj-tags');
+      final response = await _client.delete(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId, 'set_id': setId, 'tag': tag}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Échec deleteDjTag: Status ${response.statusCode} - Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Échec de la suppression du tag: $e');
+    }
+  }
+
   // ========== SCÈNES (ex-districts) ==========
 
   static Future<List<Stage>> fetchStages({int? festivalId}) async {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/stages?festival_id=$fid');
-      final response = await http.get(url).timeout(const Duration(seconds: 30));
+      final response = await _getWithRetry(url);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -262,7 +366,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/stages/$stageName');
-      final response = await http.put(
+      final response = await _client.put(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'festival_id': fid, ...coordinates}),
@@ -292,7 +396,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/geoloc');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -322,7 +426,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/events?festival_id=$fid&user_id=$userId');
-      final response = await http.get(url).timeout(const Duration(seconds: 30));
+      final response = await _getWithRetry(url);
 
       if (response.statusCode == 200) {
         return List<dynamic>.from(json.decode(response.body));
@@ -344,7 +448,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/events');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -370,7 +474,7 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/events/last?festival_id=$fid&user_id=$userId');
-      final response = await http.delete(url).timeout(const Duration(seconds: 30));
+      final response = await _client.delete(url).timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
         throw Exception(

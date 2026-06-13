@@ -100,10 +100,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Rebuild toute l'app quand le thème change.
-    return ValueListenableBuilder<int>(
-      valueListenable: AppTheme.revision,
-      builder: (context, _, _) {
+    // Rebuild toute l'app quand le thème change OU quand les données chargées en
+    // arrière-plan (équipe, favoris de tous, tags) arrivent → les vues qui en
+    // dépendent (Tendances, Tags, mode équipe) se peuplent sans action de l'user.
+    return ListenableBuilder(
+      listenable: Listenable.merge(
+          [AppTheme.revision, AppDataManager().dataRevision]),
+      builder: (context, _) {
         return MaterialApp(
           title: AppDataManager().selectedFestival?.name ?? 'FestCompanion',
           theme: AppTheme.themeData(),

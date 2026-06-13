@@ -26,11 +26,30 @@ class ProfileAvatar extends StatefulWidget {
 
 class _ProfileAvatarState extends State<ProfileAvatar> {
   late Future<String?> _photoFuture;
+  late final VoidCallback _photosListener;
 
   @override
   void initState() {
     super.initState();
     _photoFuture = _resolvePhotoUrl();
+    // Re-résout depuis le cache quand les photos de fond arrivent.
+    // ⚠️ Corps de bloc (et non flèche) : `setState(() => _photoFuture = …)`
+    // RENVOIE le Future assigné → Flutter loggue « setState() callback argument
+    // returned a Future ». Ici la closure ne retourne rien (void).
+    _photosListener = () {
+      if (mounted) {
+        setState(() {
+          _photoFuture = _resolvePhotoUrl();
+        });
+      }
+    };
+    AppDataManager().photosRevision.addListener(_photosListener);
+  }
+
+  @override
+  void dispose() {
+    AppDataManager().photosRevision.removeListener(_photosListener);
+    super.dispose();
   }
 
   Future<String?> _resolvePhotoUrl() async {

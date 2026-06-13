@@ -1,4 +1,3 @@
-import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../services/app_data_manager.dart';
 import '../models/user_model.dart';
@@ -8,6 +7,7 @@ import '../widgets/profile/profile_photo.dart';
 import '../widgets/profile/profile_text_field.dart';
 import '../widgets/profile/location_toggle.dart';
 import '../widgets/profile/coordinates_section.dart';
+import '../widgets/shared/festival_background.dart';
 import '../helpers/profile_helper.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -187,9 +187,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final profile = _profileData!;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: ProfileAppBar(onSavePressed: _saveProfile),
-      body: Container(
-        color: AppTheme.background,
+      body: FestivalBackground(
+        imageKey: 'featured',
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: SingleChildScrollView(
@@ -203,7 +204,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 8),
                 const Text(
                   'Ajouter une photo',
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: Colors.white70),
                 ),
                 const SizedBox(height: 30),
                 ProfileTextField(

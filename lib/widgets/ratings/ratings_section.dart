@@ -120,7 +120,7 @@ class _RatingsSectionState extends State<RatingsSection> {
       children: [
         // ── Titre ───────────────────────────────────────────────────────────
         const Text(
-          'Notation et tags',
+          'Notation',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 14),

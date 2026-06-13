@@ -57,15 +57,9 @@ class UserCard extends StatelessWidget {
                         user.phoneNumber!,
                         style: const TextStyle(color: Colors.white70, fontSize: 15),
                       ),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 12, color: Colors.white54),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Position actuelle : ${stageName ?? 'autre'}',
-                          style: const TextStyle(color: Colors.white54, fontSize: 11),
-                        ),
-                      ],
+                    Text(
+                      'Position : ${stageName ?? 'autre'}',
+                      style: const TextStyle(color: Colors.white54, fontSize: 11),
                     ),
                   ],
                 ),

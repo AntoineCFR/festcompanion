@@ -3,12 +3,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/timetable_item.dart';
 import '../models/user_model.dart';
 import '../models/user_favorite.dart';
+import '../models/dj_tag.dart';
 import '../models/stage_model.dart';
 import '../models/festival_model.dart';
 import '../models/event_model.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/profile_service.dart';
+import '../services/notification_scheduler.dart';
 import '../theme/app_theme.dart';
 
 // ✅ Clé globale pour precacheImage
@@ -33,6 +35,8 @@ class AppDataManager {
     _allUserFavorites = {};
     _allFavoritesLoaded = false;
     _userEvents = [];
+    _djTags = [];
+    _djTagsLoaded = false;
   }
 
   // Festival sélectionné (état de session, partagé par toutes les pages)
@@ -43,10 +47,24 @@ class AppDataManager {
   List<User> _users = [];
   Map<int, String?> _photoUrls = {};
 
+  /// Incrémenté quand des photos chargées en arrière-plan deviennent
+  /// disponibles → les avatars (qui l'écoutent) se redessinent sans recharger.
+  final ValueNotifier<int> photosRevision = ValueNotifier<int>(0);
+
+  /// Vrai une fois les URLs de photos résolues (1×/session). Évite de relancer
+  /// les requêtes Firebase Storage à chaque `loadUsers()` (ex. ouverture de la
+  /// page Équipe) → supprime le flot de `StorageUtil/getToken` dans les logs.
+  bool _photosLoaded = false;
+
   // Données utilisateur (dépendent de l'utilisateur connecté)
   Map<int, UserFavorite> _userFavorites = {};
   Map<int, Map<int, UserFavorite>> _allUserFavorites = {};
   bool _allFavoritesLoaded = false;
+
+  // Tags collaboratifs (tous utilisateurs, tout le festival)
+  List<DjTag> _djTags = [];
+  bool _djTagsLoaded = false;
+
   int? _userId;
   String _selectedDay = 'friday';
   FavoriteFilterMode _filterMode = FavoriteFilterMode.normal;
@@ -120,6 +138,7 @@ class AppDataManager {
     ApiService.currentFestivalId = null;
     AppTheme.onFestivalChanged(null);
     await LocalStorageService().clearSelectedFestival();
+    NotificationScheduler.cancelAll().ignore();
     reset();
     _stages = [];
   }
@@ -135,9 +154,36 @@ class AppDataManager {
     return days;
   }
 
+  /// Clé jour en anglais minuscule ('monday'..'sunday') à partir d'une date.
+  static String _weekdayKey(DateTime d) {
+    const keys = [
+      'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
+    ];
+    return keys[d.toLocal().weekday - 1];
+  }
+
   void _ensureValidSelectedDay() {
     final days = festivalDays;
     if (days.isEmpty) return;
+
+    // Si on est PENDANT le festival et qu'aujourd'hui figure au line-up, on
+    // sélectionne le jour courant par défaut (ex. un samedi de festival ouvre
+    // directement sur « samedi »).
+    final f = _selectedFestival;
+    final now = DateTime.now();
+    final withinFestival = f != null &&
+        !now.isBefore(f.startDate) &&
+        now.isBefore(f.endDate.add(const Duration(days: 1)));
+    final todayKey = _weekdayKey(now);
+    if (withinFestival && days.contains(todayKey)) {
+      if (_selectedDay != todayKey) {
+        _selectedDay = todayKey;
+        LocalStorageService().saveSelectedDay(_selectedDay);
+      }
+      return;
+    }
+
+    // Sinon : garder le jour stocké s'il est valide, sinon le premier.
     if (!days.contains(_selectedDay)) {
       _selectedDay = days.first;
       LocalStorageService().saveSelectedDay(_selectedDay);
@@ -177,6 +223,23 @@ class AppDataManager {
     return result;
   }
 
+  // ── Tags ──────────────────────────────────────────────────────────────────
+  List<DjTag> get djTags => _djTags;
+
+  /// Tags posés sur un set donné (tous utilisateurs confondus).
+  List<DjTag> tagsForSet(int setId) =>
+      _djTags.where((t) => t.setId == setId).toList();
+
+  /// Libellés de tags distincts du festival, triés alphabétiquement.
+  List<String> get allTagLabels {
+    final labels = _djTags.map((t) => t.tag).toSet().toList()..sort();
+    return labels;
+  }
+
+  /// set_ids ayant ce tag (posé par au moins un utilisateur).
+  Set<int> setIdsForTag(String tag) =>
+      _djTags.where((t) => t.tag == tag).map((t) => t.setId).toSet();
+
   // Getters pour les données utilisateur
   Set<int> get favoriteSetIds => _userFavorites.entries
       .where((entry) => entry.value.isFavorite)
@@ -201,26 +264,86 @@ class AppDataManager {
   // Récupère UserFavorite pour un set_id
   UserFavorite? getUserFavorite(int setId) => _userFavorites[setId];
 
-  // Charge les données GLOBALES (timetable + utilisateurs + TOUS les favoris).
-  // Les trois requêtes sont indépendantes → on les lance EN PARALLÈLE pour
-  // raccourcir nettement le temps de chargement au lancement.
-  Future<void> loadAllData() async {
+  /// Bumpé quand les données SECONDAIRES (équipe, favoris de tous, tags),
+  /// chargées en arrière-plan, deviennent disponibles → l'app se redessine pour
+  /// les afficher (cf. `main.dart`).
+  final ValueNotifier<int> dataRevision = ValueNotifier<int>(0);
+  bool _secondaryLoading = false;
+
+  // Données ESSENTIELLES au 1er écran (Accueil/Live = countdown, now/next) : la
+  // timetable seule. On bloque uniquement dessus (souvent servie depuis le cache
+  // créneaux), et on lance le RESTE en arrière-plan → l'app s'ouvre tout de suite.
+  Future<void> loadEssentialData() async {
     try {
-      await Future.wait([
-        loadTimetable(),
-        loadUsers(),
-        loadAllUserFavorites(),
-      ]);
+      await loadTimetable();
     } catch (e) {
-      _showErrorMessage('Erreur lors du chargement des données globales : $e');
+      _showErrorMessage('Erreur lors du chargement des données : $e');
       rethrow;
+    } finally {
+      // Le reste (équipe, favoris de tous, tags) n'est pas requis pour l'accueil.
+      loadSecondaryData().ignore();
     }
   }
 
-  // Charge la timetable du festival sélectionné
-  Future<void> loadTimetable() async {
+  // Données SECONDAIRES chargées EN TÂCHE DE FOND : utilisateurs (Équipe + fans),
+  // favoris/notes de tous (Tendances, mode équipe), tags collaboratifs (vue Tags,
+  // fiche DJ). Notifie [dataRevision] à la fin → les vues se rafraîchissent.
+  // Best-effort : chaque chargeur gère déjà ses erreurs/cache.
+  Future<void> loadSecondaryData() async {
+    if (_secondaryLoading) return;
+    _secondaryLoading = true;
+    try {
+      await Future.wait([
+        loadUsers(),
+        loadAllUserFavorites(),
+        loadDjTags(),
+      ]);
+    } catch (_) {
+      // ignoré : non bloquant pour l'usage principal
+    } finally {
+      _secondaryLoading = false;
+      dataRevision.value++;
+    }
+  }
+
+  /// Créneaux de rafraîchissement de la timetable (heures locales). Le line-up
+  /// bouge très rarement → inutile de le re-télécharger entre deux créneaux.
+  static const List<int> timetableRefreshHours = [12, 18, 22];
+
+  /// Dernier créneau de rafraîchissement atteint à [now] (avant 12h = 22h veille).
+  static DateTime _latestTimetableSlot(DateTime now) {
+    final midnight = DateTime(now.year, now.month, now.day);
+    DateTime? slot;
+    for (final h in timetableRefreshHours) {
+      final b = midnight.add(Duration(hours: h));
+      if (!b.isAfter(now)) slot = b;
+    }
+    return slot ??
+        midnight.subtract(const Duration(days: 1)).add(const Duration(hours: 22));
+  }
+
+  // Charge la timetable du festival sélectionné.
+  //
+  // Par défaut, **réutilise le cache local** tant qu'aucun créneau de
+  // rafraîchissement (12/18/22h) n'est passé depuis le dernier fetch → pas de
+  // requête réseau superflue au démarrage (le line-up change rarement). Passer
+  // [force] pour ignorer le cache (ex. pull-to-refresh).
+  Future<void> loadTimetable({bool force = false}) async {
     final fid = selectedFestivalId;
     if (fid == null) throw Exception('Aucun festival sélectionné.');
+
+    if (!force) {
+      final ts = LocalStorageService().getTimetableTimestamp(fid);
+      if (ts != null && !ts.isBefore(_latestTimetableSlot(DateTime.now()))) {
+        final cached = await LocalStorageService().getTimetable(fid);
+        if (cached.isNotEmpty) {
+          _timetable = cached;
+          _ensureValidSelectedDay();
+          return; // cache frais → aucune requête
+        }
+      }
+    }
+
     try {
       _timetable = await ApiService.fetchTimetable();
       await LocalStorageService().saveTimetable(_timetable, fid);
@@ -237,23 +360,51 @@ class AppDataManager {
   Future<void> loadUsers() async {
     try {
       _users = (await ApiService.fetchUsers()).map((map) => User.fromMap(map)).toList();
-      _photoUrls.clear();
 
-      // Récupère les URLs de photos EN PARALLÈLE (auparavant : une requête
-      // Firebase Storage séquentielle par utilisateur → très lent au lancement).
-      await Future.wait(_users.map((user) async {
-        final photoUrl = await ProfileService.getPhotoUrl(user.id);
-        _photoUrls[user.id] = photoUrl;
+      // Pré-remplit le cache à null pour les users SANS écraser une URL déjà
+      // résolue : `photoUrls` reste la source de vérité (ProfileAvatar teste
+      // `containsKey`) et les avatars affichent l'initiale en attendant.
+      for (final user in _users) {
+        _photoUrls.putIfAbsent(user.id, () => null);
+      }
 
-        if (photoUrl != null && navigatorKey.currentContext != null) {
-          precacheImage(CachedNetworkImageProvider(photoUrl), navigatorKey.currentContext!);
-        }
-      }));
+      // ⚡ Photos en ARRIÈRE-PLAN, mais UNE SEULE FOIS par session : on ne
+      // rejoue pas les requêtes Firebase Storage à chaque loadUsers (sinon la
+      // page Équipe les relance à chaque ouverture → flot de StorageUtil/getToken).
+      if (!_photosLoaded) {
+        _loadPhotosInBackground();
+      }
     } catch (e) {
       _showErrorMessage('Impossible de charger les utilisateurs : $e');
       _users = [];
-      _photoUrls.clear();
       rethrow;
+    }
+  }
+
+  /// Charge les URLs de photos en tâche de fond : un seul `listAll()` pour savoir
+  /// qui a une photo (évite les 404), puis les URLs en parallèle. Best-effort :
+  /// un échec ne casse rien. Notifie les avatars à la fin via [photosRevision].
+  /// Marque [_photosLoaded] pour ne pas rejouer ces requêtes la session durant.
+  Future<void> _loadPhotosInBackground() async {
+    try {
+      final withPhoto = await ProfileService.listUserIdsWithPhoto();
+      final targets = withPhoto == null
+          ? _users
+          : _users.where((u) => withPhoto.contains(u.id)).toList();
+      await Future.wait(targets.map((user) async {
+        final photoUrl = await ProfileService.getPhotoUrl(user.id);
+        _photoUrls[user.id] = photoUrl;
+        if (photoUrl != null && navigatorKey.currentContext != null) {
+          precacheImage(
+              CachedNetworkImageProvider(photoUrl), navigatorKey.currentContext!);
+        }
+      }));
+      _photosLoaded = true; // succès → on ne rejoue plus (cache valable la session)
+    } catch (_) {
+      // Photos best-effort : on ignore les erreurs (avatars = initiales) et on
+      // laisse _photosLoaded à false pour retenter au prochain loadUsers.
+    } finally {
+      photosRevision.value++;
     }
   }
 
@@ -279,6 +430,69 @@ class AppDataManager {
     } catch (e) {
       _showErrorMessage('Impossible de charger les favoris des utilisateurs : $e');
       _allFavoritesLoaded = false;
+    }
+  }
+
+  // Charge TOUS les tags du festival (tous utilisateurs)
+  Future<void> loadDjTags() async {
+    if (_djTagsLoaded) return;
+    try {
+      _djTags = await ApiService.fetchDjTags();
+      _djTagsLoaded = true;
+    } catch (e) {
+      _showErrorMessage('Impossible de charger les tags : $e');
+      _djTagsLoaded = false;
+    }
+  }
+
+  /// Ajoute un tag sur un set (optimiste + sync serveur). Idempotent : ne crée
+  /// pas de doublon si l'utilisateur courant a déjà ce tag sur ce set.
+  Future<void> addDjTag(int setId, String rawTag) async {
+    final tag = DjTag.normalize(rawTag);
+    if (tag.isEmpty || _userId == null) return;
+
+    final alreadyMine = _djTags.any(
+      (t) => t.setId == setId && t.userId == _userId && t.tag == tag,
+    );
+    if (alreadyMine) return;
+
+    final optimistic = DjTag(userId: _userId!, setId: setId, tag: tag);
+    _djTags.add(optimistic);
+
+    try {
+      final saved = await ApiService.addDjTag(_userId!, setId, tag);
+      // Le serveur peut renormaliser différemment : on réaligne le cache.
+      if (saved != tag) {
+        _djTags.remove(optimistic);
+        final exists = _djTags.any(
+          (t) => t.setId == setId && t.userId == _userId && t.tag == saved,
+        );
+        if (!exists) _djTags.add(DjTag(userId: _userId!, setId: setId, tag: saved));
+      }
+    } catch (e) {
+      _djTags.remove(optimistic);
+      _showErrorMessage('Impossible d\'ajouter le tag.');
+    }
+  }
+
+  /// Supprime SON propre tag sur un set (optimiste + sync serveur).
+  Future<void> removeDjTag(int setId, String tag) async {
+    if (_userId == null) return;
+    DjTag? removed;
+    _djTags.removeWhere((t) {
+      if (t.setId == setId && t.userId == _userId && t.tag == tag) {
+        removed = t;
+        return true;
+      }
+      return false;
+    });
+    if (removed == null) return;
+
+    try {
+      await ApiService.deleteDjTag(_userId!, setId, tag);
+    } catch (e) {
+      _djTags.add(removed!);
+      _showErrorMessage('Impossible de supprimer le tag.');
     }
   }
 
@@ -310,6 +524,9 @@ class AppDataManager {
     if (index != -1) {
       _users[index] = _users[index].copyWith(photoUrl: photoUrl);
     }
+    // Met aussi à jour le cache lu par les avatars (équipe, AppBar) → la
+    // nouvelle photo apparaît sans attendre un rechargement complet.
+    _photoUrls[userId] = photoUrl;
   }
 
   // Met à jour la localisation d'un utilisateur + scène
@@ -338,11 +555,15 @@ class AppDataManager {
     _userFavorites = {};
     _allUserFavorites = {};
     _allFavoritesLoaded = false;
+    _djTags = [];
+    _djTagsLoaded = false;
     _userId = null;
     _selectedDay = 'friday';
     _filterMode = FavoriteFilterMode.normal;
     _users = [];
     _userEvents = [];
+    _photoUrls.clear();
+    _photosLoaded = false;
   }
 
   void setSelectedDay(String day) {
@@ -374,6 +595,9 @@ class AppDataManager {
     );
 
     if (fid != null) await LocalStorageService().saveUserFavorites(_userFavorites, fid);
+
+    // Replanifie les rappels de sets favoris (ce favori vient de changer).
+    if (_userId != null) NotificationScheduler.rescheduleAll(_userId!).ignore();
 
     if (_userId != null) {
       try {
@@ -420,7 +644,15 @@ class AppDataManager {
     }
   }
 
-  // Synchronise les notations en arrière-plan
+  // Synchronise les notations en arrière-plan.
+  //
+  // Déclenchée notamment à la mise en arrière-plan de l'app
+  // (didChangeAppLifecycleState → paused/detached). Sur ce cycle, l'OS coupe
+  // souvent le réseau en plein vol → un échec ici est NORMAL et sans gravité
+  // (toggle/rate synchronisent déjà chacun de leur côté en avant-plan). On reste
+  // donc SILENCIEUX : afficher une SnackBar « impossible de synchroniser » à ce
+  // moment-là la fait surgir au retour dans l'app (« impossible de charger les
+  // favoris ») alors que rien n'est cassé. Best-effort, on avale l'erreur.
   Future<void> syncFavorites() async {
     if (_userId == null) return;
     final fid = selectedFestivalId;
@@ -437,7 +669,8 @@ class AppDataManager {
       }
       if (fid != null) await LocalStorageService().saveUserFavorites(_userFavorites, fid);
     } catch (e) {
-      _showErrorMessage('Impossible de synchroniser les favoris avec le serveur.');
+      // Best-effort silencieux : voir le commentaire ci-dessus.
+      debugPrint('syncFavorites (background) a échoué, ignoré : $e');
     }
   }
 
@@ -489,13 +722,31 @@ class AppDataManager {
   }
 
   // ========== EVENT MANAGEMENT ==========
+
+  /// Événements en cache local (affichage instantané avant le rafraîchissement
+  /// réseau). Vide si aucun cache.
+  Future<List<Event>> getCachedUserEvents(int userId) async {
+    final fid = selectedFestivalId;
+    if (fid == null) return [];
+    return LocalStorageService().getUserEvents(fid, userId);
+  }
+
   Future<void> loadUserEvents(int userId) async {
     _isLoadingEvents = true;
+    final fid = selectedFestivalId;
     try {
       _userEvents = (await ApiService.fetchUserEvents(userId))
           .map((e) => Event.fromJson(e))
           .toList();
+      if (fid != null) {
+        await LocalStorageService().saveUserEvents(_userEvents, fid, userId);
+      }
     } catch (e) {
+      // Repli sur le cache pour ne pas vider l'affichage en cas de coupure.
+      if (fid != null) {
+        final cached = await LocalStorageService().getUserEvents(fid, userId);
+        if (cached.isNotEmpty) _userEvents = cached;
+      }
       _showErrorMessage('Impossible de charger les événements : $e');
       rethrow;
     } finally {

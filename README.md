@@ -76,9 +76,18 @@ This repository contains the **Flutter client**. The companion REST API lives in
 - **5-point rating** per set, with aggregated views of who-liked-what.
 - Fully **offline-tolerant**: optimistic local updates with background sync to the server.
 
+### 🏷️ Collaborative DJ tags
+- Any user can add free-text **tags** (no spaces, auto-prefixed with `#`) to a set; everyone sees them, each chip carrying its author's avatar — like the notes.
+- Tap your own tag to remove it (with confirmation).
+- A dedicated **"DJ by tag"** screen lets you pick any existing tag and browse every DJ that matches it.
+
+### 📈 Trending (best-rated DJs)
+- A **"Trending"** screen ranks the festival's DJs by a **Bayesian average** of the group's ratings, so a set with many good ratings outranks one with a single perfect score.
+- Computed entirely client-side from already-cached ratings — no extra endpoint or query.
+
 ### 📍 Find your friends (geolocation)
-- The festival grounds are split into named **stages** defined by GPS bounding boxes.
-- Periodic **background location updates** (every 15 min via WorkManager) map each user to a stage.
+- The festival grounds are split into named **stages** defined by GPS bounding boxes; each stage also carries a **rally point** the group can navigate to in one tap.
+- **Foreground-only** location: a member's position refreshes when they open the app (or tap a "lost" alert) — no background tracking, so permissions stay simple and the battery is spared.
 - See where every group member currently is — no need to text "where r u??".
 
 ### 🚨 Real-time group alerts (push)
@@ -148,7 +157,7 @@ Three one-tap event types broadcast to everyone via Firebase Cloud Messaging:
 | **Local cache** | `shared_preferences` (per-festival namespacing) |
 | **Push** | `firebase_messaging` + `flutter_local_notifications` (foreground display) |
 | **Auth & media** | `firebase_auth`, `firebase_storage`, `image_picker`, `cached_network_image` |
-| **Location** | `geolocator`, `location`, `workmanager` (periodic background task) |
+| **Location** | `geolocator`, `location` (foreground fixes only) |
 | **Config** | `flutter_dotenv` |
 | **Backend** | Python · Flask · Flask-CORS · Gunicorn |
 | **Data** | Google BigQuery (`google-cloud-bigquery`, pandas) |
@@ -168,7 +177,6 @@ lib/
 │   ├── api_service.dart      #   REST client (injects festival_id)
 │   ├── local_storage_service.dart
 │   ├── fcm_service.dart      #   push notification wiring
-│   ├── geoloc_background_service.dart  # WorkManager periodic GPS → backend
 │   ├── auth_service.dart · profile_service.dart · weather_service.dart
 ├── pages/                    # Screens (festival selection, home, lineup, timetable, stages, events, profile, team, login…)
 ├── widgets/                  # Reusable UI, grouped by feature (home/ lineup/ timetable/ ratings/ team/ stages/…)
@@ -192,7 +200,9 @@ A few problems worth calling out — these are the kinds of things that came up 
 
 - **BigQuery streaming buffer vs. DML.** Newly *streamed* rows can't be `DELETE`d/`UPDATE`d for ~90 minutes. The "delete my last event" feature kept failing because of this. Fixed by switching event inserts from streaming inserts to **batch load jobs**, which are immediately available to DML.
 
-- **Background geolocation across isolates.** Updating a user's location while the app is closed runs in a top-level `@pragma('vm:entry-point')` WorkManager callback in a **separate isolate** — which can't see the app's singletons (so `ApiService.currentFestivalId` is invisible there). Both `userId` **and** `festivalId` are therefore handed off through `SharedPreferences`, and the task requires `LocationPermission.always`.
+- **Foreground-only geolocation (a deliberate scope cut).** An earlier design tracked location in the background via a WorkManager isolate, which forced `LocationPermission.always`, drained battery, and was unreliable for small/overlapping stage zones. It was dropped in favour of refreshing a member's position only when the app is **open** — or when they tap a "lost" alert (the push handler fires a one-shot fix). Simpler permissions ("while in use"), no battery cost, and good enough for a group converging on a rally point.
+
+- **Bayesian ranking on tiny samples.** With ~15 users and only a handful of ratings per set, a plain average lets a single 5★ top the chart. The "Trending" screen uses a Bayesian average — `(C·m + Σ) / (C + n)` with a tuned confidence constant `C` — to pull thinly-rated sets toward the global mean. It runs client-side over already-cached ratings, so it costs no extra round-trip.
 
 - **Offline-first, optimistic UI.** Favorites/ratings update local state immediately and cache to disk (cache keys namespaced per festival to avoid cross-event bleed), then sync to the server; on a flaky festival network the UI never blocks, and the app falls back to a cached timetable/stages when the API is unreachable.
 
@@ -212,6 +222,7 @@ The Flask service exposes a small, focused REST surface. Every data endpoint is 
 | `GET` | `/timetable?festival_id=` | Full line-up (times adjusted to the festival TZ) |
 | `GET` | `/users?festival_id=` · `/users/check` | Users on a festival / resolve username → id |
 | `GET` `POST` | `/api/user-favorites` `/toggle` `/rate` | Read / toggle / rate favorites (UPSERT) |
+| `GET` `POST` `DELETE` | `/api/dj-tags` | Read / add / remove collaborative DJ tags (keyed by set) |
 | `GET` `PUT` | `/api/stages` `/api/stages/<name>` | Read / update stage geo-boxes |
 | `POST` | `/api/geoloc` | Push a user's GPS → resolve & store stage |
 | `GET` `POST` `DELETE` | `/api/events` `/api/events/last` | Read / create / undo SOS·lost·hype events |

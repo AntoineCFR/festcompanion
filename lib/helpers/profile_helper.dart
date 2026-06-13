@@ -49,8 +49,18 @@ class ProfileHelper {
   static Future<void> refreshLocationIfEnabled(int userId) async {
     try {
       if (!await LocationHelper.isLocationEnabled()) return;
-      final position = await LocationHelper.tryGetCurrentPosition();
+
+      // Position connue récente (< 2 min) → instantanée, pas d'acquisition GPS.
+      // Sinon seulement, on déclenche un fix frais (borné à 10 s).
+      var position = await LocationHelper.getLastKnownPosition();
+      final isRecent = position != null &&
+          DateTime.now().difference(position.timestamp) <=
+              const Duration(minutes: 2);
+      if (!isRecent) {
+        position = await LocationHelper.tryGetCurrentPosition();
+      }
       if (position == null) return;
+
       final response = await ApiService.updateGeoloc(
         userId: userId,
         lat: position.latitude,

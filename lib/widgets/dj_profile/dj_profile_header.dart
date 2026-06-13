@@ -73,6 +73,9 @@ class DJProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Décale les boutons SOUS la barre d'état (notch/encoche inclus) : un
+    // `top` fixe empiétait sur le bandeau système selon les appareils.
+    final topInset = MediaQuery.of(context).padding.top + 8;
     return Column(
       children: [
         Stack(
@@ -80,7 +83,7 @@ class DJProfileHeader extends StatelessWidget {
             _buildHeaderImage(),
             // Bouton retour (à gauche)
             Positioned(
-              top: 32,
+              top: topInset,
               left: 16,
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -93,7 +96,7 @@ class DJProfileHeader extends StatelessWidget {
             ),
             // Favorite star (à droite, symétrique)
             Positioned(
-              top: 32,
+              top: topInset,
               right: 16,
               child: FavoriteStar(
                 isFavorite: isFavorite,
@@ -122,6 +125,7 @@ class DJProfileHeader extends StatelessWidget {
                 ),
               if (startTime != null && endTime != null)
                 Text(
+                  '${AppUtils.getWeekdayName(startTime!)}  ·  '
                   '${AppUtils.formatTime(startTime!)} - ${AppUtils.formatTime(endTime!)}',
                   style: const TextStyle(fontSize: 18),
                   textAlign: TextAlign.center,

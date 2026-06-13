@@ -7,6 +7,8 @@ import '../services/app_data_manager.dart';
 import '../helpers/team_helper.dart';
 import '../widgets/team/user_avatar.dart';
 import '../widgets/ratings/rating_text.dart';
+import '../widgets/shared/dj_photo.dart';
+import '../widgets/shared/festival_background.dart';
 import '../utils/utils.dart';
 import 'djprofilepage.dart';
 
@@ -58,134 +60,198 @@ class UserProfilePage extends StatelessWidget {
     final hasKnownLocation = user.lastLocation != '?';
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(user.username),
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── En-tête : avatar + nom + ID ──────────────────────────────
-            Center(
-              child: Column(
-                children: [
-                  UserAvatar(user: user, radius: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    user.username,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+      body: FestivalBackground(
+        imageKey: 'featured',
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── En-tête : avatar (anneau accent) + nom + ID ─────────────
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.accent, width: 2.5),
+                        ),
+                        child: UserAvatar(user: user, radius: 46),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        user.username,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'ID ${user.id}',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 13),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'ID : ${user.id}',
-                    style: const TextStyle(color: Colors.white54, fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
-
-            // ── Téléphone ────────────────────────────────────────────────
-            _InfoRow(
-              icon: Icons.phone,
-              label: hasPhone ? user.phoneNumber! : 'Non renseigné',
-              available: hasPhone,
-              actionIcon: hasPhone ? Icons.call : null,
-              onAction: hasPhone ? () => TeamHelper.callUser(user.phoneNumber!) : null,
-            ),
-            const SizedBox(height: 12),
-
-            // ── Localisation ─────────────────────────────────────────────
-            _InfoRow(
-              icon: Icons.location_on,
-              label: hasKnownLocation ? user.lastLocation : 'Position inconnue',
-              available: hasKnownLocation,
-              actionIcon: hasLocation ? Icons.near_me : null,
-              onAction: hasLocation
-                  ? () => TeamHelper.locateUser(user.lastLat, user.lastLng)
-                  : null,
-            ),
-
-            const SizedBox(height: 32),
-
-            // ── Favoris classés ──────────────────────────────────────────
-            const Text(
-              'Favoris',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            if (ranked.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  'Aucun favori enregistré.',
-                  style: TextStyle(color: Colors.white54),
                 ),
-              )
-            else
-              ...ranked.map(
-                (r) => _FavoriteSetTile(item: r.item, notation: r.notation),
-              ),
+                const SizedBox(height: 28),
 
-            SizedBox(height: 24 + MediaQuery.of(context).padding.bottom),
-          ],
+                // ── Contact (icône unique par action, plus de doublon) ──────
+                _ContactTile(
+                  icon: Icons.phone,
+                  title: 'Téléphone',
+                  value: hasPhone ? user.phoneNumber! : 'Non renseigné',
+                  actionLabel: 'Appeler',
+                  onTap: hasPhone
+                      ? () => TeamHelper.callUser(user.phoneNumber!)
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                _ContactTile(
+                  icon: Icons.place,
+                  title: 'Position',
+                  value:
+                      hasKnownLocation ? user.lastLocation : 'Position inconnue',
+                  actionLabel: 'Itinéraire',
+                  onTap: hasLocation
+                      ? () => TeamHelper.locateUser(user.lastLat, user.lastLng)
+                      : null,
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Favoris classés ─────────────────────────────────────────
+                const Text(
+                  'Favoris',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                if (ranked.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'Aucun favori enregistré.',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  )
+                else
+                  ...ranked.map(
+                    (r) => _FavoriteSetTile(item: r.item, notation: r.notation),
+                  ),
+
+                SizedBox(height: 24 + MediaQuery.of(context).padding.bottom),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Ligne d'info (téléphone / localisation) ─────────────────────────────────
-class _InfoRow extends StatelessWidget {
+// ── Tuile de contact (téléphone / localisation) ─────────────────────────────
+// Une seule icône par action (l'icône de gauche), tuile entièrement tappable :
+// fini les icônes dupliquées (pin + flèche, combiné + appel).
+class _ContactTile extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final bool available;
-  final IconData? actionIcon;
-  final VoidCallback? onAction;
+  final String title;
+  final String value;
+  final String actionLabel;
+  final VoidCallback? onTap;
 
-  const _InfoRow({
+  const _ContactTile({
     required this.icon,
-    required this.label,
-    required this.available,
-    this.actionIcon,
-    this.onAction,
+    required this.title,
+    required this.value,
+    required this.actionLabel,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: available ? Colors.white70 : Colors.white24, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: available ? Colors.white : Colors.white38,
-              fontSize: 15,
-            ),
+    final enabled = onTap != null;
+    return Material(
+      color: AppTheme.surface.withValues(alpha: 0.85),
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.accent.withValues(alpha: 0.18),
+                ),
+                child: Icon(icon, color: AppTheme.accent, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                          color: Colors.white54, fontSize: 12),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: enabled ? Colors.white : Colors.white38,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (enabled) ...[
+                const SizedBox(width: 8),
+                Text(
+                  actionLabel,
+                  style: TextStyle(
+                    color: AppTheme.accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        if (actionIcon != null)
-          IconButton(
-            icon: Icon(actionIcon, color: Colors.white),
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.only(left: 8),
-            onPressed: onAction,
-          ),
-      ],
+      ),
     );
   }
 }
@@ -228,19 +294,12 @@ class _FavoriteSetTile extends StatelessWidget {
           child: Row(
             children: [
               // Photo DJ
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.asset(
-                  AppUtils.getDjImagePath(item.dj),
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 48,
-                    height: 48,
-                    color: AppTheme.surfaceAlt,
-                    child: const Icon(Icons.person, color: Colors.white54, size: 24),
-                  ),
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: DjPhoto(djName: item.dj),
                 ),
               ),
               const SizedBox(width: 12),
@@ -262,7 +321,7 @@ class _FavoriteSetTile extends StatelessWidget {
                       '${item.stage} · '
                       '${AppUtils.formatTime(item.startTime)} – '
                       '${AppUtils.formatTime(item.endTime)}',
-                      style: const TextStyle(color: Colors.white54, fontSize: 13),
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
                     ),
                   ],
                 ),

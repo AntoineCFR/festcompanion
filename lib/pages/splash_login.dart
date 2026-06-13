@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../services/app_data_manager.dart';
 import '../services/fcm_service.dart';
+import '../services/notification_scheduler.dart';
 import '../helpers/profile_helper.dart';
 import 'main_screen.dart';
 
@@ -36,10 +37,14 @@ class _SplashLoginState extends State<SplashLogin> {
   /// 2. Initialisation FCM (permissions + écouteurs de notifications)
   /// 3. MAJ de position à l'ouverture (best-effort, si le partage est activé)
   Future<void> _init() async {
+    // Seul le chargement des favoris (depuis le cache si déjà préchargé) bloque
+    // l'entrée dans l'app. FCM et la MAJ de position partent en arrière-plan :
+    // ce sont des effets de bord, inutile de retarder l'écran principal.
     await AppDataManager().loadFavorites(widget.userId);
-    await FcmService.init();
-    // Fire-and-forget : ne bloque pas l'entrée dans l'app.
+    FcmService.init();
     ProfileHelper.refreshLocationIfEnabled(widget.userId);
+    // Planifie les rappels locaux (sets favoris + hydratation) en arrière-plan.
+    NotificationScheduler.rescheduleAll(widget.userId);
   }
 
   @override

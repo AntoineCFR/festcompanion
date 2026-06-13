@@ -53,7 +53,7 @@ class _FestivalGateState extends State<FestivalGate> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: FutureBuilder<void>(
-        future: AppDataManager().loadAllData(),
+        future: AppDataManager().loadEssentialData(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const _CenteredLoader(message: 'Chargement des données...');

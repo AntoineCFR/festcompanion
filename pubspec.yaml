@@ -2,7 +2,7 @@ name: festcompanion  # Nom de ton appli (sans espaces, en snake_case)
 description: All you need in one place for your summer festivals!
 
 # Version de l'appli (format : major.minor.patch)
-version: 1.0.2+2
+version: 1.0.3+3
 
 environment:
   sdk: '^3.11.0'  # Version du SDK Dart compatible
@@ -23,9 +23,9 @@ dependencies:
   geolocator: ^14.0.2
   cached_network_image: ^3.3.0
   clipboard: ^3.0.14  # ✅ Pour copier le numéro dans le presse-papier
-  location: ^8.0.1
   flutter_dotenv: ^6.0.1
   flutter_local_notifications: ^18.0.0  # Affichage notifications locales (foreground)
+  timezone: ^0.10.0  # Planification de notifications locales à l'heure du festival
 
 dev_dependencies:
   flutter_test:
@@ -38,10 +38,12 @@ flutter:
   assets:
     - .env
     - lib/assets/
+    - lib/assets/backgrounds/
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "lib/assets/icon/icon.png"
-  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_background: "lib/assets/icon/icon_background.png"
+  adaptive_icon_foreground: "lib/assets/icon/icon_foreground.png"
   remove_alpha_ios: true

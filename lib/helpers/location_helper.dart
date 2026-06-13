@@ -13,10 +13,6 @@ class LocationHelper {
   // ========== CONSTANTES ==========
   static const String _locationEnabledKey = 'location_enabled';
 
-  // Coordonnées du festival (Parking Camping)
-  static const double festivalLatitude = 51.026997;
-  static const double festivalLongitude = 5.443735;
-
   // ========== PERMISSIONS ==========
 
   /// Vérifie si le service de localisation est activé sur l'appareil
@@ -66,8 +62,26 @@ class LocationHelper {
   }) async {
     await ensurePermissions();
     return await Geolocator.getCurrentPosition(
-      locationSettings: LocationSettings(accuracy: accuracy),
+      // timeLimit : sans borne, un fix GPS haute précision peut prendre des
+      // dizaines de secondes (intérieur, émulateur) et bloquer l'appelant. Au-delà
+      // de 10 s, on lève un TimeoutException (capté en best-effort par
+      // tryGetCurrentPosition → null).
+      locationSettings: LocationSettings(
+        accuracy: accuracy,
+        timeLimit: const Duration(seconds: 10),
+      ),
     );
+  }
+
+  /// Dernière position connue par l'OS (cache) — INSTANTANÉE (aucune acquisition
+  /// GPS). Peut être null (jamais localisé) ou ancienne. À combiner avec un fix
+  /// frais quand la fraîcheur compte.
+  static Future<Position?> getLastKnownPosition() async {
+    try {
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Récupère la position actuelle (retourne null si échec)
@@ -138,15 +152,6 @@ class LocationHelper {
       debugPrint('Erreur Google Maps (query): $e');
       return false;
     }
-  }
-
-  /// Ouvre le parking du festival dans Google Maps (fallback Extrema codé en dur)
-  static Future<bool> openFestivalLocation() async {
-    return await openInGoogleMaps(
-      latitude: festivalLatitude,
-      longitude: festivalLongitude,
-      label: 'Parking Camping Extrema',
-    );
   }
 
   // ========== UTILITAIRES ==========

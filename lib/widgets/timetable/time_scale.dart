@@ -29,9 +29,15 @@ class TimeScale extends StatelessWidget {
 
     DateTime current = firstFullHour;
     while (current.isBefore(end)) {
+      // La dernière heure peut être partielle (set finissant à XX:30) : on borne
+      // la largeur de la case au temps réellement restant, sinon elle réclame une
+      // heure pleine (180px) et déborde de la timetable.
+      final double boxWidth = (current.difference(end).inMinutes.abs() *
+              TimetableConstants.pixelsPerMinute)
+          .clamp(0.0, TimetableConstants.pixelsPerHour);
       labels.add(
         SizedBox(
-          width: TimetableConstants.pixelsPerHour,
+          width: boxWidth,
           child: Align(
             alignment: Alignment.centerLeft,
             child: Padding(

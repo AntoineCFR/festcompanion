@@ -18,6 +18,14 @@ class AppUtils {
     }
   }
 
+  /// Nom du jour de la semaine en français (depuis une DateTime).
+  static String getWeekdayName(DateTime date) {
+    const days = [
+      'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'
+    ];
+    return days[date.toLocal().weekday - 1];
+  }
+
   static String formatTime(DateTime date) {
     final localDate = date.toLocal();
     return '${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';

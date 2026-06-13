@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../services/app_data_manager.dart';
 import '../helpers/location_helper.dart';
 import '../widgets/stages/stage_card.dart';
+import '../widgets/shared/festival_background.dart';
 
 class StagesPage extends StatefulWidget {
   final String username;
@@ -23,7 +24,6 @@ class StagesPage extends StatefulWidget {
 class _StagesPageState extends State<StagesPage> {
   List<Stage> _stages = [];
   bool _isLoading = true;
-  String? _selectedStage;
   String? _userRole;
 
   @override
@@ -42,8 +42,24 @@ class _StagesPageState extends State<StagesPage> {
 
       if (!mounted) return;
 
+      // Ordre d'affichage = `stage_order` du festival. La table `stages`
+      // (géoloc) ne le porte pas, mais la timetable si → on en dérive un ordre
+      // par nom de scène, avec repli alphabétique insensible à la casse pour les
+      // scènes absentes de la timetable.
+      final orderByStage = <String, int>{};
+      for (final item in AppDataManager().timetable) {
+        final o = item.stageOrder;
+        if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
+      }
       final stages = List<Stage>.from(AppDataManager().stages)
-        ..sort((a, b) => a.stage.compareTo(b.stage));
+        ..sort((a, b) {
+          final oa = orderByStage[a.stage];
+          final ob = orderByStage[b.stage];
+          if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
+          if (oa != null && ob == null) return -1;
+          if (oa == null && ob != null) return 1;
+          return a.stage.toLowerCase().compareTo(b.stage.toLowerCase());
+        });
 
       final user = AppDataManager().users.firstWhere(
         (u) => u.id == widget.userId,
@@ -52,7 +68,6 @@ class _StagesPageState extends State<StagesPage> {
 
       setState(() {
         _stages = stages;
-        _selectedStage = stages.isNotEmpty ? stages.first.stage : null;
         _userRole = user.userRole;
         _isLoading = false;
       });
@@ -179,102 +194,87 @@ class _StagesPageState extends State<StagesPage> {
     }
   }
 
-  void _showStagePicker() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppTheme.surfaceAlt,
-      builder: (ctx) => ListView(
-        shrinkWrap: true,
-        children: _stages
-            .map(
-              (s) => ListTile(
-                title: Text(
-                  s.stage,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: s.stage == _selectedStage
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                ),
-                trailing: s.stage == _selectedStage
-                    ? const Icon(Icons.check, color: Colors.blue)
-                    : null,
-                onTap: () {
-                  setState(() => _selectedStage = s.stage);
-                  Navigator.pop(ctx);
-                },
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final current = _selectedStage != null
-        ? _stages.where((s) => s.stage == _selectedStage).firstOrNull
-        : null;
-
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Scènes'),
         backgroundColor: AppTheme.surface,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Bandeau sélecteur — cliquable
-                GestureDetector(
-                  onTap: _stages.isNotEmpty ? _showStagePicker : null,
-                  child: Container(
-                    width: double.infinity,
-                    color: AppTheme.surfaceAlt,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _selectedStage ?? 'Aucune scène',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_drop_down, color: Colors.white),
-                      ],
-                    ),
-                  ),
-                ),
-                // Carte de la scène sélectionnée
-                if (current != null)
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: StageCard(
-                        stage: current,
-                        isAdmin: _isAdmin,
-                        onSetCoordinates: _setCoordinates,
-                        onOpenInMaps: _openInGoogleMaps,
-                      ),
-                    ),
-                  )
-                else
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        'Aucune scène disponible',
-                        style: TextStyle(color: Colors.white54),
-                      ),
-                    ),
-                  ),
-              ],
+      body: FestivalBackground(
+        imageKey: 'featured',
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _stages.isEmpty
+                ? _buildEmptyState()
+                : _buildStageList(),
+      ),
+    );
+  }
+
+  Widget _buildStageList() {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: _stages.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) return _buildIntro();
+        final stage = _stages[index - 1];
+        return StageCard(
+          key: ValueKey(stage.stage),
+          stage: stage,
+          isAdmin: _isAdmin,
+          onSetCoordinates: _setCoordinates,
+          onOpenInMaps: _openInGoogleMaps,
+        );
+      },
+    );
+  }
+
+  Widget _buildIntro() {
+    final count = _stages.length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16, left: 2),
+      child: Row(
+        children: [
+          Icon(Icons.place_outlined, size: 18, color: AppTheme.accent),
+          const SizedBox(width: 8),
+          Text(
+            '$count scène${count > 1 ? 's' : ''} · touche pour le point de ralliement',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.location_off_outlined,
+                size: 56, color: Colors.white.withValues(alpha: 0.25)),
+            const SizedBox(height: 16),
+            const Text(
+              'Aucune scène disponible',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
+            const SizedBox(height: 6),
+            const Text(
+              'Les scènes de ce festival n\'ont pas encore été ajoutées.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white60, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

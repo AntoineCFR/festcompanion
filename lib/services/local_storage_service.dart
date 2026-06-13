@@ -4,6 +4,7 @@ import '../models/timetable_item.dart';
 import '../models/user_favorite.dart';
 import '../models/stage_model.dart';
 import '../models/festival_model.dart';
+import '../models/event_model.dart';
 
 class LocalStorageService {
   static final LocalStorageService _instance = LocalStorageService._internal();
@@ -12,6 +13,7 @@ class LocalStorageService {
 
   static const String _userFavoritesKey = 'userFavorites';
   static const String _timetableKey = 'timetable';
+  static const String _timetableTsKey = 'timetable_ts';
   static const String _stagesKey = 'stages';
   static const String _selectedDayKey = 'selectedDay';
   static const String _showFavoritesOnlyKey = 'showFavoritesOnly';
@@ -76,6 +78,16 @@ class LocalStorageService {
   Future<void> saveTimetable(List<TimetableItem> timetable, int festivalId) async {
     final List<String> timetableJson = timetable.map((item) => jsonEncode(item.toJson())).toList();
     await _prefs.setStringList('${_timetableKey}_$festivalId', timetableJson);
+    // Horodatage du fetch → permet de savoir si le cache est encore frais
+    // (cf. créneaux de rafraîchissement de la timetable).
+    await _prefs.setString(
+        '${_timetableTsKey}_$festivalId', DateTime.now().toIso8601String());
+  }
+
+  /// Date du dernier enregistrement de la timetable (null si jamais).
+  DateTime? getTimetableTimestamp(int festivalId) {
+    final s = _prefs.getString('${_timetableTsKey}_$festivalId');
+    return s == null ? null : DateTime.tryParse(s);
   }
 
   Future<List<TimetableItem>> getTimetable(int festivalId) async {
@@ -104,6 +116,22 @@ class LocalStorageService {
 
   Future<bool> getShowFavoritesOnly() async {
     return _prefs.getBool(_showFavoritesOnlyKey) ?? false;
+  }
+
+  // ========== ÉVÉNEMENTS (namespacés par festival + utilisateur) ==========
+
+  Future<void> saveUserEvents(
+      List<Event> events, int festivalId, int userId) async {
+    final list = events.map((e) => jsonEncode(e.toJson())).toList();
+    await _prefs.setStringList('events_${festivalId}_$userId', list);
+  }
+
+  Future<List<Event>> getUserEvents(int festivalId, int userId) async {
+    final list = _prefs.getStringList('events_${festivalId}_$userId');
+    if (list == null) return [];
+    return list
+        .map((s) => Event.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
   }
 
   // ========== SCÈNES (namespacées par festival) ==========
