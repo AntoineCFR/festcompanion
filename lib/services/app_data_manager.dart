@@ -273,7 +273,13 @@ class AppDataManager {
   // Données ESSENTIELLES au 1er écran (Accueil/Live = countdown, now/next) : la
   // timetable seule. On bloque uniquement dessus (souvent servie depuis le cache
   // créneaux), et on lance le RESTE en arrière-plan → l'app s'ouvre tout de suite.
-  Future<void> loadEssentialData() async {
+  // Garde anti-concurrence : si plusieurs appelants (rebuilds) lancent
+  // loadEssentialData pendant qu'un chargement est déjà en cours, ils partagent
+  // le MÊME Future au lieu de déclencher des fetchs parallèles (request storm).
+  Future<void>? _essentialInFlight;
+  Future<void> loadEssentialData() => _essentialInFlight ??= _loadEssentialDataOnce();
+
+  Future<void> _loadEssentialDataOnce() async {
     try {
       await loadTimetable();
     } catch (e) {
@@ -282,6 +288,7 @@ class AppDataManager {
     } finally {
       // Le reste (équipe, favoris de tous, tags) n'est pas requis pour l'accueil.
       loadSecondaryData().ignore();
+      _essentialInFlight = null;
     }
   }
 
@@ -328,22 +335,42 @@ class AppDataManager {
   // rafraîchissement (12/18/22h) n'est passé depuis le dernier fetch → pas de
   // requête réseau superflue au démarrage (le line-up change rarement). Passer
   // [force] pour ignorer le cache (ex. pull-to-refresh).
-  Future<void> loadTimetable({bool force = false}) async {
+  // Garde anti-concurrence : un seul chargement timetable en vol à la fois ;
+  // les appels concurrents partagent le même Future (évite N téléchargements
+  // parallèles du gros payload bios → request storm).
+  Future<void>? _timetableInFlight;
+  Future<void> loadTimetable({bool force = false}) {
+    final existing = _timetableInFlight;
+    if (existing != null) return existing;
+    final f = _loadTimetableImpl(force: force);
+    _timetableInFlight = f;
+    return f.whenComplete(() {
+      if (identical(_timetableInFlight, f)) _timetableInFlight = null;
+    });
+  }
+
+  Future<void> _loadTimetableImpl({bool force = false}) async {
     final fid = selectedFestivalId;
     if (fid == null) throw Exception('Aucun festival sélectionné.');
 
     if (!force) {
-      final ts = LocalStorageService().getTimetableTimestamp(fid);
-      if (ts != null && !ts.isBefore(_latestTimetableSlot(DateTime.now()))) {
-        final cached = await LocalStorageService().getTimetable(fid);
-        if (cached.isNotEmpty) {
-          _timetable = cached;
-          _ensureValidSelectedDay();
-          return; // cache frais → aucune requête
-        }
+      // Stale-while-revalidate : si on a un cache local, on l'affiche
+      // IMMÉDIATEMENT (zéro réseau sur le chemin critique de démarrage). On ne
+      // re-télécharge le gros payload (bios) qu'en ARRIÈRE-PLAN, et seulement si
+      // un créneau (12/18/22h) est passé depuis le dernier fetch.
+      final cached = await LocalStorageService().getTimetable(fid);
+      if (cached.isNotEmpty) {
+        _timetable = cached;
+        _ensureValidSelectedDay();
+        final ts = LocalStorageService().getTimetableTimestamp(fid);
+        final stale =
+            ts == null || ts.isBefore(_latestTimetableSlot(DateTime.now()));
+        if (stale) _refreshTimetableInBackground(fid);
+        return;
       }
     }
 
+    // Aucun cache (tout 1er lancement) ou refresh forcé → fetch bloquant.
     try {
       _timetable = await ApiService.fetchTimetable();
       await LocalStorageService().saveTimetable(_timetable, fid);
@@ -353,6 +380,29 @@ class AppDataManager {
       rethrow;
     } finally {
       _ensureValidSelectedDay();
+    }
+  }
+
+  bool _timetableRefreshing = false;
+
+  // Rafraîchit la timetable en arrière-plan (stale-while-revalidate). Ne bloque
+  // jamais l'UI, avale les erreurs (le cache déjà affiché reste valable), et
+  // notifie [dataRevision] si de nouvelles données arrivent → Live/Accueil se
+  // redessinent. Abandonne si l'utilisateur a changé de festival entre-temps.
+  Future<void> _refreshTimetableInBackground(int fid) async {
+    if (_timetableRefreshing) return;
+    _timetableRefreshing = true;
+    try {
+      final fresh = await ApiService.fetchTimetable();
+      if (fid != selectedFestivalId) return;
+      _timetable = fresh;
+      await LocalStorageService().saveTimetable(_timetable, fid);
+      _ensureValidSelectedDay();
+      dataRevision.value++;
+    } catch (_) {
+      // best-effort : le cache déjà affiché reste valable
+    } finally {
+      _timetableRefreshing = false;
     }
   }
 
@@ -499,22 +549,49 @@ class AppDataManager {
   // Charge les favoris de l'utilisateur connecté
   Future<void> loadFavorites(int userId) async {
     final fid = selectedFestivalId;
-    try {
-      _userId = userId;
+    _userId = userId;
 
-      if (_allFavoritesLoaded && _allUserFavorites.containsKey(userId)) {
-        // Copie shallow pour éviter l'aliasing.
-        _userFavorites = Map.from(_allUserFavorites[userId]!);
-      } else {
-        final serverFavorites = await ApiService.fetchUserFavorites(userId) as Map<int, UserFavorite>;
-        _userFavorites = serverFavorites;
+    // Déjà préchargé (favoris de tous, tâche secondaire) → copie locale, instantané.
+    if (_allFavoritesLoaded && _allUserFavorites.containsKey(userId)) {
+      _userFavorites = Map.from(_allUserFavorites[userId]!); // shallow, anti-aliasing
+      return;
+    }
+
+    // Stale-while-revalidate : on affiche le cache disque immédiatement (pas de
+    // GET bloquant sur le chemin critique du splash) et on rafraîchit en fond.
+    if (fid != null) {
+      final cached = await LocalStorageService().getUserFavorites(fid);
+      if (cached.isNotEmpty) {
+        _userFavorites = cached;
+        _refreshFavoritesInBackground(userId, fid);
+        return;
       }
+    }
 
+    // Aucun cache (1er lancement) → fetch bloquant.
+    try {
+      final serverFavorites = await ApiService.fetchUserFavorites(userId) as Map<int, UserFavorite>;
+      _userFavorites = serverFavorites;
       if (fid != null) await LocalStorageService().saveUserFavorites(_userFavorites, fid);
     } catch (e) {
       _showErrorMessage('Impossible de charger les favoris depuis le serveur.');
       if (fid != null) _userFavorites = await LocalStorageService().getUserFavorites(fid);
       rethrow;
+    }
+  }
+
+  // Rafraîchit les favoris/notes de l'utilisateur en arrière-plan (SWR). Avale
+  // les erreurs (cache affiché valable), abandonne si le festival ou l'user a
+  // changé, et notifie [dataRevision] si de nouvelles données arrivent.
+  Future<void> _refreshFavoritesInBackground(int userId, int fid) async {
+    try {
+      final fresh = await ApiService.fetchUserFavorites(userId) as Map<int, UserFavorite>;
+      if (fid != selectedFestivalId || userId != _userId) return;
+      _userFavorites = fresh;
+      await LocalStorageService().saveUserFavorites(_userFavorites, fid);
+      dataRevision.value++;
+    } catch (_) {
+      // best-effort : le cache déjà affiché reste valable
     }
   }
 

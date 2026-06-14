@@ -30,22 +30,36 @@ class FestivalGate extends StatefulWidget {
 
 class _FestivalGateState extends State<FestivalGate> {
   Festival? _selected;
+  // ⚠️ Le Future DOIT être stocké en champ (pas recréé inline dans le
+  // FutureBuilder) : MaterialApp se reconstruit à chaque `dataRevision++`
+  // (chargements de fond), ce qui rebâtit FestivalGate. Un future inline
+  // relancerait loadEssentialData à chaque rebuild → boucle infinie de
+  // requêtes (request storm sur /timetable). Cf. incident 2026-06-14.
+  Future<void>? _loadFuture;
   bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.forceSelection ? null : AppDataManager().selectedFestival;
+    if (_selected != null) {
+      _loadFuture = AppDataManager().loadEssentialData();
+    }
   }
 
   Future<void> _onFestivalChosen(Festival festival) async {
     await AppDataManager().setSelectedFestival(festival);
-    if (mounted) setState(() => _selected = festival);
+    if (mounted) {
+      setState(() {
+        _selected = festival;
+        _loadFuture = AppDataManager().loadEssentialData();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_selected == null) {
+    if (_selected == null || _loadFuture == null) {
       return _FestivalPicker(onChosen: _onFestivalChosen);
     }
 
@@ -53,7 +67,7 @@ class _FestivalGateState extends State<FestivalGate> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: FutureBuilder<void>(
-        future: AppDataManager().loadEssentialData(),
+        future: _loadFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const _CenteredLoader(message: 'Chargement des données...');
@@ -73,7 +87,9 @@ class _FestivalGateState extends State<FestivalGate> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () => setState(() {}),
+                    onPressed: () => setState(() {
+                      _loadFuture = AppDataManager().loadEssentialData();
+                    }),
                     child: const Text('Réessayer'),
                   ),
                 ],

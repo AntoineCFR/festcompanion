@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/timetable_item.dart';
@@ -33,12 +34,15 @@ class ApiService {
     return id;
   }
 
-  /// GET résilient avec réessais. Le backend est hébergé sur Render (plan
-  /// gratuit) : après une période d'inactivité il s'endort et le PREMIER appel
-  /// met plusieurs dizaines de secondes à le réveiller (timeout, ou 502/503
-  /// transitoires). Plutôt que d'échouer et de forcer un « Réessayer » manuel,
-  /// on retente automatiquement : le réveil est déclenché au 1er essai, les
-  /// suivants aboutissent. Réservé aux GET (idempotents) — jamais les écritures.
+  /// GET résilient avec réessais, pour absorber un réseau de festival capricieux
+  /// et les 502/503/504 transitoires de la passerelle. Réservé aux GET
+  /// (idempotents) — jamais les écritures.
+  ///
+  /// ⚠️ Chaque essai utilise [_cancellableGet] qui **annule réellement** la
+  /// requête (ferme la socket) en cas de dépassement de délai, au lieu de la
+  /// laisser tourner côté serveur. Sans ça, un essai expiré continue d'aboutir
+  /// sur le serveur et un fetch qui retente empile des requêtes fantômes
+  /// (cf. incident request storm 2026-06-14).
   static Future<http.Response> _getWithRetry(
     Uri url, {
     int attempts = 3,
@@ -47,7 +51,7 @@ class ApiService {
     Object? lastError;
     for (var i = 0; i < attempts; i++) {
       try {
-        final resp = await _client.get(url).timeout(timeout);
+        final resp = await _cancellableGet(url, timeout);
         // 502/503/504 = passerelle/serveur en cours de réveil → on retente.
         if (resp.statusCode == 502 ||
             resp.statusCode == 503 ||
@@ -64,6 +68,65 @@ class ApiService {
       }
     }
     throw Exception('Serveur injoignable après $attempts tentatives ($lastError)');
+  }
+
+  /// GET annulable : lit la réponse en streaming sur le client partagé
+  /// (keep-alive préservé) et, si [timeout] expire, **annule la souscription**
+  /// → la socket de CETTE requête est fermée et le serveur cesse de la traiter.
+  /// Contrairement à `client.get(url).timeout()`, qui abandonne l'attente mais
+  /// laisse la requête vivre jusqu'au bout côté serveur.
+  static Future<http.Response> _cancellableGet(Uri url, Duration timeout) {
+    final completer = Completer<http.Response>();
+    StreamSubscription<List<int>>? sub;
+    final bytes = <int>[];
+
+    // Délai global unique (couvre l'établissement de connexion ET la lecture).
+    final timer = Timer(timeout, () {
+      if (!completer.isCompleted) {
+        sub?.cancel(); // ferme la socket de cette requête (si déjà connectée)
+        completer.completeError(
+            TimeoutException('Délai dépassé', timeout));
+      }
+    });
+
+    _client.send(http.Request('GET', url)).then((streamed) {
+      if (completer.isCompleted) {
+        // Déjà expiré pendant la connexion → on draine et on jette.
+        streamed.stream.drain<void>().catchError((_) {});
+        return;
+      }
+      sub = streamed.stream.listen(
+        bytes.addAll,
+        onDone: () {
+          if (!completer.isCompleted) {
+            timer.cancel();
+            completer.complete(http.Response.bytes(
+              bytes,
+              streamed.statusCode,
+              request: streamed.request,
+              headers: streamed.headers,
+              isRedirect: streamed.isRedirect,
+              persistentConnection: streamed.persistentConnection,
+              reasonPhrase: streamed.reasonPhrase,
+            ));
+          }
+        },
+        onError: (Object e) {
+          if (!completer.isCompleted) {
+            timer.cancel();
+            completer.completeError(e);
+          }
+        },
+        cancelOnError: true,
+      );
+    }).catchError((Object e) {
+      if (!completer.isCompleted) {
+        timer.cancel();
+        completer.completeError(e);
+      }
+    });
+
+    return completer.future;
   }
 
   // ========== FESTIVALS ==========
