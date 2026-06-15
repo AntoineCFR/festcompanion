@@ -22,6 +22,11 @@ class DJListTile extends StatelessWidget {
   /// où l'horaire n'apporte rien et alourdit la tuile.
   final bool showTime;
 
+  /// Réagit au mode de filtre GLOBAL (favoris/équipe) : ligne « scène » + rangée
+  /// de fans. Désactivé dans la vue « DJ par tag », qui ne doit dépendre d'aucun
+  /// filtre — elle affiche seulement photo, nom, tags, étoile et note.
+  final bool showFilterContext;
+
   const DJListTile({
     super.key,
     required this.item,
@@ -30,6 +35,7 @@ class DJListTile extends StatelessWidget {
     this.onTap, // ✅ NOUVEAU
     this.footer,
     this.showTime = true,
+    this.showFilterContext = true,
   });
 
   // Largeur de la photo et écart photo↔texte. La photo est posée en Positioned
@@ -86,8 +92,9 @@ class DJListTile extends StatelessWidget {
                                       : Colors.white70,
                                 ),
                               ),
-                            if (AppDataManager().showFavoritesOnly ||
-                                AppDataManager().showAllUsersFavorites)
+                            if (showFilterContext &&
+                                (AppDataManager().showFavoritesOnly ||
+                                    AppDataManager().showAllUsersFavorites))
                               Text(
                                 item.stage,
                                 style: TextStyle(
@@ -124,7 +131,7 @@ class DJListTile extends StatelessWidget {
                     ],
                   ),
                   // Fans — uniquement en mode "Favoris équipe"
-                  if (AppDataManager().showAllUsersFavorites)
+                  if (showFilterContext && AppDataManager().showAllUsersFavorites)
                     Builder(builder: (_) {
                       final fans =
                           AppDataManager().getUsersWhoFavorited(item.setId);

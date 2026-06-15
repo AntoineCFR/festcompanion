@@ -172,6 +172,8 @@ class _EventsPageState extends State<EventsPage>
       // (cache vide) — sinon il s'affiche instantanément.
       body: FestivalBackground(
         imageKey: 'featured',
+        refreshDomains: const [LoadDomain.events],
+        refreshLabel: 'Mise à jour des événements…',
         child: Column(
           children: [
             // Roue — 3/5 de l'espace

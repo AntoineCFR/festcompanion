@@ -103,6 +103,8 @@ class _LineupPageState extends State<LineupPage> {
 
     return FestivalBackground(
       imageKey: 'featured',
+      refreshDomains: const [LoadDomain.timetable],
+      refreshLabel: 'Mise à jour du line-up…',
       child: Column(
         children: [
           LineupHeader(

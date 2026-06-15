@@ -65,6 +65,8 @@ class _TeamPageState extends State<TeamPage> {
       ),
       body: FestivalBackground(
         imageKey: 'featured',
+        refreshDomains: const [LoadDomain.team],
+        refreshLabel: 'Mise à jour de l\'équipe…',
         child: _isLoading && users.isEmpty
             ? const Center(child: CircularProgressIndicator())
             : users.isEmpty

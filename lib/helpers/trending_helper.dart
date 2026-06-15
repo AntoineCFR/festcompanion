@@ -83,13 +83,18 @@ class TrendingHelper {
       ));
     });
 
-    // 4) Tri : score bayésien décroissant, puis nb de notes, puis moyenne brute.
+    // 4) Tri : score bayésien décroissant, puis nb de notes, puis moyenne brute,
+    //    puis nom du DJ (départage déterministe — le tri Dart n'est pas stable,
+    //    donc sans ce dernier critère deux ex-aequo parfaits auraient un ordre
+    //    arbitraire qui pourrait changer d'un build à l'autre).
     entries.sort((a, b) {
       final byScore = b.bayesian.compareTo(a.bayesian);
       if (byScore != 0) return byScore;
       final byCount = b.count.compareTo(a.count);
       if (byCount != 0) return byCount;
-      return b.average.compareTo(a.average);
+      final byAvg = b.average.compareTo(a.average);
+      if (byAvg != 0) return byAvg;
+      return a.item.dj.toLowerCase().compareTo(b.item.dj.toLowerCase());
     });
 
     return entries;

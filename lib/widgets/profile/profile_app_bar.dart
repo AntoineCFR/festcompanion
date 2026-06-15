@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
 
 class ProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback onSavePressed;
-
-  const ProfileAppBar({
-    super.key,
-    required this.onSavePressed,
-  });
+  const ProfileAppBar({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // L'édition se fait désormais au niveau du champ « Numéro de téléphone »
+    // (bouton Éditer → Valider), seule donnée modifiable de la fiche : plus
+    // besoin d'un bouton de sauvegarde global.
     return AppBar(
       title: const Text('Mon compte'),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.save),
-          onPressed: onSavePressed,
-        ),
-      ],
     );
   }
 

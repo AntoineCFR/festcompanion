@@ -12,10 +12,22 @@ class FestivalBackground extends StatelessWidget {
   final String imageKey; // 'home' | 'featured'
   final Widget child;
 
+  /// Domaines de données dont dépend la page (cf. [LoadDomain]). Si l'un d'eux
+  /// est en cours de rafraîchissement en arrière-plan, un bandeau non bloquant
+  /// (« mise à jour en cours ») apparaît en haut, par-dessus le contenu — qui
+  /// reste affiché et navigable. Vide = aucun bandeau.
+  final List<String> refreshDomains;
+
+  /// Libellé du bandeau (ex. « Mise à jour des tendances… »). Requis si
+  /// [refreshDomains] est non vide.
+  final String? refreshLabel;
+
   const FestivalBackground({
     super.key,
     required this.imageKey,
     required this.child,
+    this.refreshDomains = const [],
+    this.refreshLabel,
   });
 
   @override
@@ -64,7 +76,80 @@ class FestivalBackground extends StatelessWidget {
           child: const SizedBox.expand(),
         ),
         child,
+        // Bandeau « mise à jour en cours » (non bloquant), si la page suit des
+        // domaines de données rafraîchis en arrière-plan.
+        if (refreshDomains.isNotEmpty && refreshLabel != null)
+          Positioned(
+            top: 8,
+            left: 0,
+            right: 0,
+            child: _RefreshBanner(domains: refreshDomains, label: refreshLabel!),
+          ),
       ],
+    );
+  }
+}
+
+/// Pastille flottante non intrusive signalant un rafraîchissement de fond.
+/// Observe [AppDataManager.backgroundLoads] et s'affiche/efface seule en fondu ;
+/// `IgnorePointer` → ne capture aucun tap (la page reste pleinement navigable).
+class _RefreshBanner extends StatelessWidget {
+  final List<String> domains;
+  final String label;
+
+  const _RefreshBanner({required this.domains, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ValueListenableBuilder<Set<String>>(
+        valueListenable: AppDataManager().backgroundLoads,
+        builder: (context, loads, _) {
+          final active = domains.any(loads.contains);
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: !active
+                ? const SizedBox.shrink()
+                : Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              label,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 12.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+          );
+        },
+      ),
     );
   }
 }

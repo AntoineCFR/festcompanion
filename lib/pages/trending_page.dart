@@ -71,8 +71,9 @@ class _TrendingViewState extends State<TrendingView> {
           'Le classement utilise une moyenne pondérée (bayésienne) : un set avec '
           'beaucoup de bonnes notes passe devant un set avec très peu de notes, '
           'même excellentes.\n\n'
-          'Le chiffre affiché est la moyenne réelle des notes /10 ; le nombre de '
-          'notes est indiqué juste en dessous.',
+          'Le grand chiffre est la moyenne réelle des notes /10. En dessous, le '
+          'score « pondéré » est celui qui sert réellement au classement (il tient '
+          'compte du nombre de notes), suivi du nombre de notes.',
           style: TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.4),
         ),
         actions: [
@@ -93,12 +94,18 @@ class _TrendingViewState extends State<TrendingView> {
     );
 
     if (ranking.isEmpty) {
-      return FestivalBackground(
-          imageKey: 'featured', child: _buildEmptyState());
+      // Classement vide : soit les notes chargent encore en arrière-plan
+      // (afficher un loader), soit il n'y a réellement aucune note (état vide).
+      final child = AppDataManager().isLoadingAllFavorites
+          ? const Center(child: CircularProgressIndicator())
+          : _buildEmptyState();
+      return FestivalBackground(imageKey: 'featured', child: child);
     }
 
     return FestivalBackground(
       imageKey: 'featured',
+      refreshDomains: const [LoadDomain.trending],
+      refreshLabel: 'Mise à jour des tendances…',
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
         itemCount: ranking.length + 1,
@@ -244,12 +251,20 @@ class _TrendingTile extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            // Chiffre principal = moyenne réelle (intuitif).
                             RatingScoreBox(score: entry.average),
                             const SizedBox(height: 3),
+                            // Score PONDÉRÉ (bayésien) : celui qui sert au
+                            // classement → affiché en petit sous la moyenne.
+                            Text(
+                              'pondéré ${entry.bayesian.toStringAsFixed(1)}',
+                              style: const TextStyle(
+                                  color: Colors.white54, fontSize: 10),
+                            ),
                             Text(
                               '${entry.count} note${entry.count > 1 ? 's' : ''}',
                               style: const TextStyle(
-                                  color: Colors.white54, fontSize: 10),
+                                  color: Colors.white38, fontSize: 10),
                             ),
                           ],
                         ),

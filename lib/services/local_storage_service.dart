@@ -1,7 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/timetable_item.dart';
+import '../models/user_model.dart';
 import '../models/user_favorite.dart';
+import '../models/dj_tag.dart';
 import '../models/stage_model.dart';
 import '../models/festival_model.dart';
 import '../models/event_model.dart';
@@ -12,6 +14,10 @@ class LocalStorageService {
   LocalStorageService._internal();
 
   static const String _userFavoritesKey = 'userFavorites';
+  static const String _allUserFavoritesKey = 'allUserFavorites';
+  static const String _djTagsKey = 'djTags';
+  static const String _photoUrlsKey = 'photoUrls';
+  static const String _usersKey = 'users';
   static const String _timetableKey = 'timetable';
   static const String _timetableTsKey = 'timetable_ts';
   static const String _stagesKey = 'stages';
@@ -71,6 +77,91 @@ class LocalStorageService {
         );
       }),
     );
+  }
+
+  // ========== FAVORIS DE TOUS (Tendances / mode équipe ; par festival) ==========
+  // Map<userId, Map<setId, UserFavorite>> aplatie en liste de {user_id, ...fav}.
+
+  Future<void> saveAllUserFavorites(
+      Map<int, Map<int, UserFavorite>> data, int festivalId) async {
+    final list = <String>[];
+    for (final userEntry in data.entries) {
+      for (final fav in userEntry.value.values) {
+        list.add(jsonEncode({'user_id': userEntry.key, ...fav.toJson()}));
+      }
+    }
+    await _prefs.setStringList('${_allUserFavoritesKey}_$festivalId', list);
+  }
+
+  Future<Map<int, Map<int, UserFavorite>>> getAllUserFavorites(
+      int festivalId) async {
+    final list = _prefs.getStringList('${_allUserFavoritesKey}_$festivalId');
+    if (list == null) return {};
+    final result = <int, Map<int, UserFavorite>>{};
+    for (final s in list) {
+      final data = jsonDecode(s) as Map<String, dynamic>;
+      final userId = data['user_id'] as int;
+      final fav = UserFavorite.fromJson(data);
+      result.putIfAbsent(userId, () => {})[fav.setId] = fav;
+    }
+    return result;
+  }
+
+  // ========== TAGS COLLABORATIFS (namespacés par festival) ==========
+
+  Future<void> saveDjTags(List<DjTag> tags, int festivalId) async {
+    final list = tags.map((t) => jsonEncode(t.toJson())).toList();
+    await _prefs.setStringList('${_djTagsKey}_$festivalId', list);
+  }
+
+  Future<List<DjTag>> getDjTags(int festivalId) async {
+    final list = _prefs.getStringList('${_djTagsKey}_$festivalId');
+    if (list == null) return [];
+    return list
+        .map((s) => DjTag.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ========== ÉQUIPE / UTILISATEURS (globaux : pas par festival) ==========
+  // Persistés pour un affichage instantané de l'équipe au lancement (et pour que
+  // le numéro de téléphone survive à un redémarrage avant le 1er fetch réseau).
+
+  Future<void> saveUsers(List<User> users) async {
+    final list = users.map((u) => jsonEncode(u.toMap())).toList();
+    await _prefs.setStringList(_usersKey, list);
+  }
+
+  Future<List<User>> getUsers() async {
+    final list = _prefs.getStringList(_usersKey);
+    if (list == null) return [];
+    return list
+        .map((s) => User.fromMap(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ========== URLS DE PHOTOS (globales : les users sont globaux) ==========
+  // Mémorise les URLs Firebase Storage résolues pour éviter de relancer
+  // listAll() + getDownloadURL() à chaque lancement. Les octets, eux, sont déjà
+  // mis en cache disque par cached_network_image → photos affichées instantanément.
+
+  Future<void> savePhotoUrls(Map<int, String?> urls) async {
+    // Ne persiste que les entrées NON nulles (users ayant réellement une photo).
+    final map = <String, String>{};
+    urls.forEach((id, url) {
+      if (url != null) map['$id'] = url;
+    });
+    await _prefs.setString(_photoUrlsKey, jsonEncode(map));
+  }
+
+  Future<Map<int, String?>> getPhotoUrls() async {
+    final raw = _prefs.getString(_photoUrlsKey);
+    if (raw == null) return {};
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      return map.map((k, v) => MapEntry(int.parse(k), v as String?));
+    } catch (_) {
+      return {};
+    }
   }
 
   // ========== TIMETABLE (namespacée par festival) ==========

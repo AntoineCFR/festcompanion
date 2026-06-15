@@ -124,23 +124,29 @@ class _TagBrowserViewState extends State<TagBrowserView> {
     }
 
     if (allTags.isEmpty) {
+      // Aucun tag : soit ils chargent encore en arrière-plan (loader), soit
+      // il n'en existe réellement aucun (état vide).
       return FestivalBackground(
         imageKey: 'featured',
-        child: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Aucun tag n\'a encore été créé.\n'
-              'Ajoutez-en depuis une fiche DJ.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
-        ),
+        child: AppDataManager().isLoadingDjTags
+            ? const Center(child: CircularProgressIndicator())
+            : const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'Aucun tag n\'a encore été créé.\n'
+                    'Ajoutez-en depuis une fiche DJ.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                ),
+              ),
       );
     }
     return FestivalBackground(
       imageKey: 'featured',
+      refreshDomains: const [LoadDomain.tags],
+      refreshLabel: 'Mise à jour des tags…',
       child: Column(
         children: [
           _buildTagSelector(),
@@ -271,6 +277,7 @@ class _TagBrowserViewState extends State<TagBrowserView> {
           item: item,
           isFavorite: AppDataManager().favoriteSetIds.contains(item.setId),
           showTime: false, // l'horaire n'apporte rien ici → tuiles plus compactes
+          showFilterContext: false, // vue Tags = insensible au filtre favoris/équipe
           onToggleFavorite: () {
             AppDataManager().toggleFavorite(item.setId);
             setState(() {});

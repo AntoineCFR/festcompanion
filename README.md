@@ -264,6 +264,103 @@ Ideas not yet implemented:
 
 ---
 
+## Release notes
+
+### 1.3.2 — 2026-06-15
+- **Fix:** the "Mon compte" screen no longer blocks behind a centred spinner on
+  open. It now follows the same pattern as the rest of the app: local cached data
+  is shown immediately, a background refresh is triggered on arrival, and the
+  non-intrusive banner indicates the server update while it's in flight.
+
+### 1.3.1 — 2026-06-15
+- **Consistency:** the non-intrusive background-refresh banner now also appears
+  on the **profile** ("Mon compte") screen, which reads its data from the team
+  list — previously only the team screen showed it.
+
+### 1.3.0 — 2026-06-15
+- **Fix:** the **DJ-by-tag** tiles reacted to the global "my favourites / team"
+  filter (showing a stage line and team fan avatars). That view is now neutral —
+  it shows only photo, DJ name, tags, the favourite star and the rating.
+- **Fix:** the **team** list and **profile photos** no longer show a centred
+  spinner / "pop in" on every launch. The user list is now persisted locally and
+  shown immediately (with the non-intrusive refresh banner), and cached photo
+  URLs are re-applied on top.
+- **Fix:** a saved **phone number** could show as "Non renseigné" after an app
+  restart — the profile read the user list before it had loaded. The list is now
+  cached locally and the profile updates as soon as it is available.
+- **Trending:** the ranking now shows the **weighted (bayesian) score** under the
+  raw average (it's what drives the order), and ties are broken deterministically
+  (score → number of ratings → raw average → DJ name) so equal entries keep a
+  stable order.
+
+### 1.2.0 — 2026-06-15
+- **Changed:** the "Mon compte" screen now edits the phone number inline
+  (**Éditer → Valider/Annuler**) instead of the global save (floppy) button in
+  the app bar, which has been removed. The phone is the only editable field, so
+  it owns its own edit flow.
+- **New:** phone numbers are validated and normalised to the canonical French
+  format **`+33 6 XX XX XX XX`** on save (accepts `06…`, `6…`, `0033…`, `+33…`
+  with spaces/dots/dashes); invalid or empty input is rejected.
+- **Fix (data loss):** the old always-on save button wrote whatever was in the
+  phone field on every tap — if the field was empty (e.g. the screen opened
+  before the user list had loaded) it could **wipe the saved number**. The new
+  edit/validate flow only writes a valid, explicitly-confirmed number, removing
+  that vector. (Verified the location update path never touches the phone field
+  server-side.)
+- **Removed:** the manual location-refresh button — position already refreshes
+  automatically on app open and on a "lost" alert, so it was redundant (and it
+  mistakenly reused the photo-upload spinner). The coordinates display is kept.
+
+### 1.1.3 — 2026-06-15
+- **Fix:** toggling **location sharing** on the profile felt very slow — the
+  switch and its confirmation snackbar only appeared after the GPS fix and the
+  network round-trip had completed. The toggle now flips, persists the consent
+  and shows the message immediately; the first position fix runs in the
+  background (best-effort, and a failure no longer cancels the consent).
+- **Perf:** team **profile photos** no longer "pop in" on every launch. The
+  resolved Firebase Storage URLs are now persisted locally and re-applied at
+  startup, so photos show instantly from the on-disk image cache while the URLs
+  are re-validated in the background (previously `listAll()` + `getDownloadURL()`
+  ran on every launch before any photo could appear).
+
+### 1.1.2 — 2026-06-15
+- **Fix:** the **Stages** screen showed the centred spinner together with the
+  refresh banner, because `loadStages` did a blocking network fetch (cache only
+  used as an error fallback) and the page also waited on the (always-network)
+  user load before rendering. Stages are now loaded stale-while-revalidate
+  (cached list shown immediately, refreshed in the background), and the screen
+  no longer blocks on the user fetch — that runs in the background just to
+  resolve the admin role. The centred spinner now only appears on the first
+  launch before any cache exists.
+
+### 1.1.1 — 2026-06-15
+- **Fix:** the **Trending** and **DJ-by-tag** screens showed a centred loading
+  spinner on every launch instead of the non-intrusive top banner, because their
+  data (all users' ratings, collaborative tags) was never cached locally — there
+  was genuinely nothing to display until the network responded. Both datasets are
+  now persisted locally (per festival) and shown immediately on launch, with the
+  background-refresh banner indicating the live update. The centred spinner now
+  only appears on the very first launch, before any local cache exists.
+
+### 1.1.0 — 2026-06-15
+- **New:** non-intrusive **background-refresh banners**. The app shows locally
+  cached data immediately and refreshes from the server in the background; while
+  a refresh is in flight, a small floating pill (e.g. _"Mise à jour des
+  tendances…"_) appears at the top of the relevant page and disappears on its
+  own when fresh data arrives. It never blocks navigation — the user keeps
+  browsing the cached data freely. Applied across the data-backed pages
+  (home/live, line-up, timetable, trending, tags, team, stages, events) via a
+  shared `backgroundLoads` signal in `AppDataManager` and the `FestivalBackground`
+  wrapper.
+
+### 1.0.5 — 2026-06-15
+- **Fix:** the **Trending** and **DJ-by-tag** screens could briefly show an empty
+  state at startup while their data was still loading in the background. They now
+  show a loading indicator until the background data is ready, and only fall back
+  to the empty state when there is genuinely nothing to display.
+
+---
+
 ## Author
 
 Built and maintained by **Antoine**.

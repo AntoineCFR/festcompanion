@@ -70,6 +70,8 @@ class _FeaturedPageState extends State<FeaturedPage> {
 
     return FestivalBackground(
       imageKey: 'featured',
+      refreshDomains: const [LoadDomain.timetable],
+      refreshLabel: 'Mise à jour du programme…',
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),

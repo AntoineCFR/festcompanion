@@ -33,47 +33,55 @@ class _StagesPageState extends State<StagesPage> {
   }
 
   Future<void> _loadData() async {
+    // 1) Scènes en premier : loadStages affiche le cache local immédiatement
+    //    (puis rafraîchit en fond → pastille). On applique dès qu'on a les
+    //    scènes, SANS attendre le réseau utilisateurs.
     try {
-      // Charge scènes et utilisateurs en parallèle
-      await Future.wait([
-        AppDataManager().loadStages(),
-        AppDataManager().loadUsers(),
-      ]);
-
-      if (!mounted) return;
-
-      // Ordre d'affichage = `stage_order` du festival. La table `stages`
-      // (géoloc) ne le porte pas, mais la timetable si → on en dérive un ordre
-      // par nom de scène, avec repli alphabétique insensible à la casse pour les
-      // scènes absentes de la timetable.
-      final orderByStage = <String, int>{};
-      for (final item in AppDataManager().timetable) {
-        final o = item.stageOrder;
-        if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
-      }
-      final stages = List<Stage>.from(AppDataManager().stages)
-        ..sort((a, b) {
-          final oa = orderByStage[a.stage];
-          final ob = orderByStage[b.stage];
-          if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
-          if (oa != null && ob == null) return -1;
-          if (oa == null && ob != null) return 1;
-          return a.stage.toLowerCase().compareTo(b.stage.toLowerCase());
-        });
-
-      final user = AppDataManager().users.firstWhere(
-        (u) => u.id == widget.userId,
-        orElse: () => User(id: -1, username: '', userRole: 'user'),
-      );
-
-      setState(() {
-        _stages = stages;
-        _userRole = user.userRole;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      await AppDataManager().loadStages();
+    } catch (_) {
+      // Échec sans cache : on retombera sur l'état vide via _applyData.
     }
+    if (mounted) _applyData();
+
+    // 2) Utilisateurs en arrière-plan : ne sert qu'au rôle admin → ne doit pas
+    //    retarder l'affichage des scènes.
+    AppDataManager().loadUsers().then((_) {
+      if (mounted) _applyData();
+    }).catchError((_) {});
+  }
+
+  /// Trie les scènes selon `stage_order` du festival et rafraîchit l'UI.
+  /// Idempotent (appelé pour les scènes puis pour le rôle utilisateur).
+  void _applyData() {
+    // Ordre d'affichage = `stage_order` du festival. La table `stages`
+    // (géoloc) ne le porte pas, mais la timetable si → on en dérive un ordre
+    // par nom de scène, avec repli alphabétique insensible à la casse pour les
+    // scènes absentes de la timetable.
+    final orderByStage = <String, int>{};
+    for (final item in AppDataManager().timetable) {
+      final o = item.stageOrder;
+      if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
+    }
+    final stages = List<Stage>.from(AppDataManager().stages)
+      ..sort((a, b) {
+        final oa = orderByStage[a.stage];
+        final ob = orderByStage[b.stage];
+        if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
+        if (oa != null && ob == null) return -1;
+        if (oa == null && ob != null) return 1;
+        return a.stage.toLowerCase().compareTo(b.stage.toLowerCase());
+      });
+
+    final user = AppDataManager().users.firstWhere(
+      (u) => u.id == widget.userId,
+      orElse: () => User(id: -1, username: '', userRole: 'user'),
+    );
+
+    setState(() {
+      _stages = stages;
+      _userRole = user.userRole;
+      _isLoading = false;
+    });
   }
 
   bool get _isAdmin => _userRole == 'admin';
@@ -204,6 +212,8 @@ class _StagesPageState extends State<StagesPage> {
       ),
       body: FestivalBackground(
         imageKey: 'featured',
+        refreshDomains: const [LoadDomain.stages],
+        refreshLabel: 'Mise à jour des scènes…',
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _stages.isEmpty

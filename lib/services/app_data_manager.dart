@@ -23,6 +23,19 @@ enum FavoriteFilterMode {
   teamFavorites // Favoris d'au moins un utilisateur de l'équipe
 }
 
+/// Clés des domaines de données suivis par [AppDataManager.backgroundLoads].
+/// Une page passe le(s) domaine(s) qui l'alimentent à [FestivalBackground] pour
+/// afficher un bandeau « mise à jour en cours » non bloquant.
+class LoadDomain {
+  LoadDomain._();
+  static const String timetable = 'timetable'; // line-up / horaires / accueil
+  static const String team = 'team';           // membres de l'équipe
+  static const String trending = 'trending';   // favoris/notes de tous (Tendances)
+  static const String tags = 'tags';           // tags collaboratifs
+  static const String stages = 'stages';       // scènes
+  static const String events = 'events';        // événements
+}
+
 class AppDataManager {
   // Singleton
   static final AppDataManager _instance = AppDataManager._internal();
@@ -270,6 +283,33 @@ class AppDataManager {
   final ValueNotifier<int> dataRevision = ValueNotifier<int>(0);
   bool _secondaryLoading = false;
 
+  /// Vrai tant que le chargement de fond des favoris/notes de TOUS les
+  /// utilisateurs n'a pas abouti. Permet à la vue Tendances d'afficher un
+  /// indicateur de chargement plutôt qu'un état « vide » trompeur au démarrage
+  /// (les données arrivent en tâche de fond → cf. [loadSecondaryData]).
+  bool get isLoadingAllFavorites => _secondaryLoading && !_allFavoritesLoaded;
+
+  /// Idem pour les tags collaboratifs (vue « DJ par tag »).
+  bool get isLoadingDjTags => _secondaryLoading && !_djTagsLoaded;
+
+  /// Domaines de données actuellement rafraîchis EN ARRIÈRE-PLAN
+  /// (stale-while-revalidate). Les pages observent ce notifier (via
+  /// [FestivalBackground]) pour afficher un bandeau « mise à jour en cours »
+  /// non bloquant : les données locales restent affichées et navigables, le
+  /// bandeau disparaît seul à la fin du rafraîchissement.
+  final ValueNotifier<Set<String>> backgroundLoads =
+      ValueNotifier<Set<String>>(const {});
+
+  void _beginLoad(String domain) {
+    if (backgroundLoads.value.contains(domain)) return;
+    backgroundLoads.value = {...backgroundLoads.value, domain};
+  }
+
+  void _endLoad(String domain) {
+    if (!backgroundLoads.value.contains(domain)) return;
+    backgroundLoads.value = {...backgroundLoads.value}..remove(domain);
+  }
+
   // Données ESSENTIELLES au 1er écran (Accueil/Live = countdown, now/next) : la
   // timetable seule. On bloque uniquement dessus (souvent servie depuis le cache
   // créneaux), et on lance le RESTE en arrière-plan → l'app s'ouvre tout de suite.
@@ -299,6 +339,9 @@ class AppDataManager {
   Future<void> loadSecondaryData() async {
     if (_secondaryLoading) return;
     _secondaryLoading = true;
+    // 'team' est marqué/démarqué par loadUsers lui-même (appelé aussi ailleurs).
+    _beginLoad(LoadDomain.trending);
+    _beginLoad(LoadDomain.tags);
     try {
       await Future.wait([
         loadUsers(),
@@ -309,6 +352,8 @@ class AppDataManager {
       // ignoré : non bloquant pour l'usage principal
     } finally {
       _secondaryLoading = false;
+      _endLoad(LoadDomain.trending);
+      _endLoad(LoadDomain.tags);
       dataRevision.value++;
     }
   }
@@ -392,6 +437,7 @@ class AppDataManager {
   Future<void> _refreshTimetableInBackground(int fid) async {
     if (_timetableRefreshing) return;
     _timetableRefreshing = true;
+    _beginLoad(LoadDomain.timetable);
     try {
       final fresh = await ApiService.fetchTimetable();
       if (fid != selectedFestivalId) return;
@@ -403,11 +449,31 @@ class AppDataManager {
       // best-effort : le cache déjà affiché reste valable
     } finally {
       _timetableRefreshing = false;
+      _endLoad(LoadDomain.timetable);
     }
   }
 
-  // Charge les utilisateurs présents sur le festival
+  // Charge les utilisateurs (stale-while-revalidate). Affiche le cache local
+  // IMMÉDIATEMENT (équipe + URLs de photos), puis rafraîchit depuis le serveur
+  // en arrière-plan (positions à jour) → pastille « mise à jour de l'équipe ».
   Future<void> loadUsers() async {
+    // Seed depuis le cache local → équipe + photos affichées tout de suite (les
+    // octets sont déjà en cache disque via cached_network_image). Évite le
+    // spinner central et le « pop » des photos à chaque lancement.
+    if (_users.isEmpty) {
+      final cached = await LocalStorageService().getUsers();
+      if (cached.isNotEmpty) {
+        _users = cached;
+        final cachedUrls = await LocalStorageService().getPhotoUrls();
+        for (final u in _users) {
+          _photoUrls[u.id] = cachedUrls[u.id]; // URL cachée, ou null (initiale)
+        }
+        dataRevision.value++;
+        photosRevision.value++;
+      }
+    }
+
+    _beginLoad(LoadDomain.team);
     try {
       _users = (await ApiService.fetchUsers()).map((map) => User.fromMap(map)).toList();
 
@@ -424,10 +490,15 @@ class AppDataManager {
       if (!_photosLoaded) {
         _loadPhotosInBackground();
       }
+
+      // Persiste l'équipe pour un affichage instantané au prochain lancement
+      // (et pour que le numéro de téléphone survive à un redémarrage).
+      await LocalStorageService().saveUsers(_users);
     } catch (e) {
       _showErrorMessage('Impossible de charger les utilisateurs : $e');
-      _users = [];
-      rethrow;
+      if (_users.isEmpty) rethrow; // pas de cache → on propage ; sinon on le garde
+    } finally {
+      _endLoad(LoadDomain.team);
     }
   }
 
@@ -436,6 +507,20 @@ class AppDataManager {
   /// un échec ne casse rien. Notifie les avatars à la fin via [photosRevision].
   /// Marque [_photosLoaded] pour ne pas rejouer ces requêtes la session durant.
   Future<void> _loadPhotosInBackground() async {
+    // Seed depuis le cache local AVANT toute requête réseau → les photos
+    // s'affichent immédiatement (octets déjà en cache disque via
+    // cached_network_image), sans le « initiale puis photo qui apparaît » à
+    // chaque lancement. La résolution réseau ci-dessous ne fait que valider/MAJ.
+    try {
+      final cachedUrls = await LocalStorageService().getPhotoUrls();
+      if (cachedUrls.isNotEmpty) {
+        cachedUrls.forEach((id, url) => _photoUrls[id] = url);
+        photosRevision.value++;
+      }
+    } catch (_) {
+      // cache best-effort
+    }
+
     try {
       final withPhoto = await ProfileService.listUserIdsWithPhoto();
       final targets = withPhoto == null
@@ -450,6 +535,8 @@ class AppDataManager {
         }
       }));
       _photosLoaded = true; // succès → on ne rejoue plus (cache valable la session)
+      // Persiste la map résolue pour un affichage instantané au prochain lancement.
+      await LocalStorageService().savePhotoUrls(_photoUrls);
     } catch (_) {
       // Photos best-effort : on ignore les erreurs (avatars = initiales) et on
       // laisse _photosLoaded à false pour retenter au prochain loadUsers.
@@ -458,9 +545,23 @@ class AppDataManager {
     }
   }
 
-  // Charge TOUS les favoris de TOUS les utilisateurs
+  // Charge TOUS les favoris de TOUS les utilisateurs (Tendances / mode équipe).
+  // Stale-while-revalidate : on affiche d'abord le cache local (la vue Tendances
+  // s'affiche INSTANTANÉMENT), puis on rafraîchit depuis le serveur en fond.
   Future<void> loadAllUserFavorites() async {
     if (_allFavoritesLoaded) return;
+    final fid = selectedFestivalId;
+
+    // Cache local d'abord → contenu affiché tout de suite (la pastille « mise à
+    // jour » signale le rafraîchissement en cours). On notifie pour rebâtir l'UI
+    // avec ces données sans attendre le réseau.
+    if (_allUserFavorites.isEmpty && fid != null) {
+      final cached = await LocalStorageService().getAllUserFavorites(fid);
+      if (cached.isNotEmpty) {
+        _allUserFavorites = cached;
+        dataRevision.value++;
+      }
+    }
 
     try {
       final allFavorites = await ApiService.fetchUserFavorites();
@@ -477,18 +578,33 @@ class AppDataManager {
         }
       }
       _allFavoritesLoaded = true;
+      if (fid != null) {
+        await LocalStorageService().saveAllUserFavorites(_allUserFavorites, fid);
+      }
     } catch (e) {
       _showErrorMessage('Impossible de charger les favoris des utilisateurs : $e');
       _allFavoritesLoaded = false;
     }
   }
 
-  // Charge TOUS les tags du festival (tous utilisateurs)
+  // Charge TOUS les tags du festival (tous utilisateurs). Même logique
+  // stale-while-revalidate que les favoris de tous.
   Future<void> loadDjTags() async {
     if (_djTagsLoaded) return;
+    final fid = selectedFestivalId;
+
+    if (_djTags.isEmpty && fid != null) {
+      final cached = await LocalStorageService().getDjTags(fid);
+      if (cached.isNotEmpty) {
+        _djTags = cached;
+        dataRevision.value++;
+      }
+    }
+
     try {
       _djTags = await ApiService.fetchDjTags();
       _djTagsLoaded = true;
+      if (fid != null) await LocalStorageService().saveDjTags(_djTags, fid);
     } catch (e) {
       _showErrorMessage('Impossible de charger les tags : $e');
       _djTagsLoaded = false;
@@ -604,6 +720,8 @@ class AppDataManager {
     // Met aussi à jour le cache lu par les avatars (équipe, AppBar) → la
     // nouvelle photo apparaît sans attendre un rechargement complet.
     _photoUrls[userId] = photoUrl;
+    // Persiste pour que la nouvelle photo survive au prochain lancement.
+    LocalStorageService().savePhotoUrls(_photoUrls).ignore();
   }
 
   // Met à jour la localisation d'un utilisateur + scène
@@ -624,6 +742,8 @@ class AppDataManager {
     if (index != -1) {
       _users[index] = _users[index].copyWith(phoneNumber: phoneNumber);
     }
+    // Persiste : le numéro survit au redémarrage même avant le 1er fetch réseau.
+    LocalStorageService().saveUsers(_users).ignore();
   }
 
   // Réinitialisation des données (utilisateur). Conserve le festival sélectionné.
@@ -751,13 +871,24 @@ class AppDataManager {
     }
   }
 
-  // Charge les scènes
+  // Charge les scènes (stale-while-revalidate). Affiche le cache local
+  // IMMÉDIATEMENT puis rafraîchit depuis le serveur en arrière-plan (pastille).
   Future<void> loadStages() async {
     if (_stages.isNotEmpty) return;
     final fid = selectedFestivalId;
     if (fid == null) throw Exception('Aucun festival sélectionné.');
 
+    // Cache local d'abord → affichage instantané, refresh réseau en fond.
+    final cached = await LocalStorageService().getStages(fid);
+    if (cached.isNotEmpty) {
+      _stages = cached;
+      _refreshStagesInBackground(fid);
+      return;
+    }
+
+    // Aucun cache (1er accès) → fetch bloquant.
     _isLoadingStages = true;
+    _beginLoad(LoadDomain.stages);
     try {
       _stages = await ApiService.fetchStages();
       await LocalStorageService().saveStages(_stages, fid);
@@ -767,6 +898,30 @@ class AppDataManager {
       rethrow;
     } finally {
       _isLoadingStages = false;
+      _endLoad(LoadDomain.stages);
+    }
+  }
+
+  bool _stagesRefreshing = false;
+
+  // Rafraîchit les scènes en arrière-plan (SWR). Avale les erreurs (le cache
+  // déjà affiché reste valable), abandonne si le festival a changé, notifie
+  // [dataRevision] si de nouvelles données arrivent.
+  Future<void> _refreshStagesInBackground(int fid) async {
+    if (_stagesRefreshing) return;
+    _stagesRefreshing = true;
+    _beginLoad(LoadDomain.stages);
+    try {
+      final fresh = await ApiService.fetchStages();
+      if (fid != selectedFestivalId) return;
+      _stages = fresh;
+      await LocalStorageService().saveStages(_stages, fid);
+      dataRevision.value++;
+    } catch (_) {
+      // best-effort : le cache déjà affiché reste valable
+    } finally {
+      _stagesRefreshing = false;
+      _endLoad(LoadDomain.stages);
     }
   }
 
@@ -810,6 +965,7 @@ class AppDataManager {
 
   Future<void> loadUserEvents(int userId) async {
     _isLoadingEvents = true;
+    _beginLoad(LoadDomain.events);
     final fid = selectedFestivalId;
     try {
       _userEvents = (await ApiService.fetchUserEvents(userId))
@@ -828,6 +984,7 @@ class AppDataManager {
       rethrow;
     } finally {
       _isLoadingEvents = false;
+      _endLoad(LoadDomain.events);
     }
   }
 

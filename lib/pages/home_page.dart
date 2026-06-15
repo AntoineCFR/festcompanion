@@ -119,6 +119,8 @@ class _HomePageState extends State<HomePage> {
 
     return FestivalBackground(
       imageKey: 'home',
+      refreshDomains: const [LoadDomain.timetable],
+      refreshLabel: 'Mise à jour du programme…',
       child: SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

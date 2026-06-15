@@ -124,6 +124,8 @@ class _TimetablePageState extends State<TimetablePage> {
 
     return FestivalBackground(
       imageKey: 'featured',
+      refreshDomains: const [LoadDomain.timetable],
+      refreshLabel: 'Mise à jour des horaires…',
       child: Column(
         children: [
           TimetableControls(
