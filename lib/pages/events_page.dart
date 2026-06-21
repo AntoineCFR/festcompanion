@@ -1,4 +1,3 @@
-import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 import '../services/app_data_manager.dart';
@@ -161,48 +160,44 @@ class _EventsPageState extends State<EventsPage>
   @override
   Widget build(BuildContext context) {
     super.build(context); // requis par AutomaticKeepAliveClientMixin
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: const Text('Événements'),
-        backgroundColor: AppTheme.surface,
-      ),
-      // La ROUE est toujours affichée immédiatement (action principale) ; seul
-      // l'historique attend les données, et uniquement au tout premier accès
-      // (cache vide) — sinon il s'affiche instantanément.
-      body: FestivalBackground(
-        imageKey: 'featured',
-        refreshDomains: const [LoadDomain.events],
-        refreshLabel: 'Mise à jour des événements…',
-        child: Column(
-          children: [
-            // Roue — 3/5 de l'espace
-            Expanded(
-              flex: 3,
-              child: _showingSos
-                  ? SosHoldButton(
-                      onCompleted: () {
-                        setState(() => _showingSos = false);
-                        _submitEvent('sos');
-                      },
-                      onCancel: () => setState(() => _showingSos = false),
-                    )
-                  : EventWheel(onEventSelected: _handleEventSelected),
-            ),
-            const Divider(color: Colors.white12, height: 1, thickness: 1),
-            // Historique — 2/5 de l'espace
-            Expanded(
-              flex: 2,
-              child: _isLoading && _events.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : RecentEventsList(
-                      events: _events,
-                      onDeleteLast:
-                          _events.isNotEmpty ? _deleteLastEvent : null,
-                    ),
-            ),
-          ],
-        ),
+    // Pas de Scaffold/AppBar ici : comme les autres onglets (Tags, Tendances…),
+    // Events est du contenu rendu sous la MainAppBar partagée. Un AppBar interne
+    // créait un second bandeau « Événements » incohérent avec le reste de l'app.
+    //
+    // La ROUE est toujours affichée immédiatement (action principale) ; seul
+    // l'historique attend les données, et uniquement au tout premier accès
+    // (cache vide) — sinon il s'affiche instantanément.
+    return FestivalBackground(
+      imageKey: 'featured',
+      refreshDomains: const [LoadDomain.events],
+      refreshLabel: 'Mise à jour des événements…',
+      child: Column(
+        children: [
+          // Roue — 3/5 de l'espace
+          Expanded(
+            flex: 3,
+            child: _showingSos
+                ? SosHoldButton(
+                    onCompleted: () {
+                      setState(() => _showingSos = false);
+                      _submitEvent('sos');
+                    },
+                    onCancel: () => setState(() => _showingSos = false),
+                  )
+                : EventWheel(onEventSelected: _handleEventSelected),
+          ),
+          const Divider(color: Colors.white12, height: 1, thickness: 1),
+          // Historique — 2/5 de l'espace
+          Expanded(
+            flex: 2,
+            child: _isLoading && _events.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : RecentEventsList(
+                    events: _events,
+                    onDeleteLast: _events.isNotEmpty ? _deleteLastEvent : null,
+                  ),
+          ),
+        ],
       ),
     );
   }

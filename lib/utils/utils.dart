@@ -5,6 +5,15 @@ class AppUtils {
   // Empêche l'instanciation (classe statique)
   AppUtils._();
 
+  /// True si des coordonnées sont exploitables : non nulles ET pas (0,0). Le
+  /// serveur renvoie (0,0) par défaut quand la position n'a jamais été partagée
+  /// (ce point tombe au large de l'Afrique) → on le traite comme « pas de
+  /// position » pour griser les actions « localiser ».
+  static bool hasValidLocation(double? lat, double? lng) =>
+      lat != null &&
+      lng != null &&
+      !(lat.abs() < 0.0001 && lng.abs() < 0.0001);
+
   static String getDayName(String day) {
     switch (day.toLowerCase()) {
       case 'monday': return 'Lundi';

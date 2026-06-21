@@ -7,6 +7,7 @@ import '../models/dj_tag.dart';
 import '../models/stage_model.dart';
 import '../models/festival_model.dart';
 import '../models/event_model.dart';
+import '../models/journal_entry.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/profile_service.dart';
@@ -15,6 +16,12 @@ import '../theme/app_theme.dart';
 
 // ✅ Clé globale pour precacheImage
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// Onglet à afficher suite au tap d'une notification locale (les onglets sont
+/// gérés en interne par MainScreen, on ne peut pas les « pousser » comme une
+/// route). MainScreen observe ce notifier et bascule sur l'onglet demandé puis
+/// le consomme (remet à null). Valeur connue : 'live'.
+final ValueNotifier<String?> pendingTabIntent = ValueNotifier<String?>(null);
 
 /// Mode de filtrage de la liste des DJs (lineup & timetable).
 enum FavoriteFilterMode {
@@ -34,6 +41,7 @@ class LoadDomain {
   static const String tags = 'tags';           // tags collaboratifs
   static const String stages = 'stages';       // scènes
   static const String events = 'events';        // événements
+  static const String journal = 'journal';      // notifications programmées
 }
 
 class AppDataManager {
@@ -77,6 +85,10 @@ class AppDataManager {
   // Tags collaboratifs (tous utilisateurs, tout le festival)
   List<DjTag> _djTags = [];
   bool _djTagsLoaded = false;
+
+  // Journal des notifications programmées (généré côté serveur).
+  List<JournalEntry> _journal = [];
+  bool _journalLoaded = false;
 
   int? _userId;
   String _selectedDay = 'friday';
@@ -611,6 +623,39 @@ class AppDataManager {
     }
   }
 
+  /// Journal des notifications programmées (les plus récentes d'abord).
+  List<JournalEntry> get journal => _journal;
+
+  /// Charge le journal des notifications (push quotidiennes, vannes, palmarès).
+  /// Stale-while-revalidate : affiche le cache local d'abord, rafraîchit en fond.
+  /// Appelé à l'ouverture de la page Journal (hors chemin critique de démarrage).
+  /// Passer [force] pour ignorer la garde « déjà chargé » (ex. pull-to-refresh).
+  Future<void> loadJournal({bool force = false}) async {
+    if (_journalLoaded && !force) return;
+    final fid = selectedFestivalId;
+    _beginLoad(LoadDomain.journal);
+
+    if (_journal.isEmpty && fid != null) {
+      final cached = await LocalStorageService().getJournal(fid);
+      if (cached.isNotEmpty) {
+        _journal = cached;
+        dataRevision.value++;
+      }
+    }
+
+    try {
+      _journal = await ApiService.fetchJournal();
+      _journalLoaded = true;
+      if (fid != null) await LocalStorageService().saveJournal(_journal, fid);
+    } catch (e) {
+      // Best-effort : on garde le cache affiché. Pas de SnackBar (page secondaire).
+      _journalLoaded = false;
+    } finally {
+      _endLoad(LoadDomain.journal);
+      dataRevision.value++;
+    }
+  }
+
   /// Ajoute un tag sur un set (optimiste + sync serveur). Idempotent : ne crée
   /// pas de doublon si l'utilisateur courant a déjà ce tag sur ce set.
   Future<void> addDjTag(int setId, String rawTag) async {
@@ -736,6 +781,17 @@ class AppDataManager {
     }
   }
 
+  /// Met à jour l'emplacement de la tente d'un utilisateur (campement) en local
+  /// et le persiste (survit au redémarrage avant le 1er fetch réseau).
+  void updateUserTent(int userId, double lat, double lng) {
+    final index = _users.indexWhere((u) => u.id == userId);
+    if (index != -1) {
+      _users[index] = _users[index].copyWith(tentLat: lat, tentLng: lng);
+      LocalStorageService().saveUsers(_users).ignore();
+      dataRevision.value++;
+    }
+  }
+
   // Met à jour le téléphone d'un utilisateur
   void updateUserPhone(int userId, String phoneNumber) {
     final index = _users.indexWhere((u) => u.id == userId);
@@ -754,6 +810,8 @@ class AppDataManager {
     _allFavoritesLoaded = false;
     _djTags = [];
     _djTagsLoaded = false;
+    _journal = [];
+    _journalLoaded = false;
     _userId = null;
     _selectedDay = 'friday';
     _filterMode = FavoriteFilterMode.normal;

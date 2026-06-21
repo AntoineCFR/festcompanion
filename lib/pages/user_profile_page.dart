@@ -1,5 +1,6 @@
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../models/user_model.dart';
 import '../models/timetable_item.dart';
 import '../models/dj_model.dart';
@@ -56,8 +57,9 @@ class UserProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ranked = _buildRankedFavorites();
     final hasPhone = user.phoneNumber?.isNotEmpty == true;
-    final hasLocation = user.lastLat != null && user.lastLng != null;
+    final hasLocation = AppUtils.hasValidLocation(user.lastLat, user.lastLng);
     final hasKnownLocation = user.lastLocation != '?';
+    final hasTent = AppUtils.hasValidLocation(user.tentLat, user.tentLng);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -136,6 +138,23 @@ class UserProfilePage extends StatelessWidget {
                       ? () => TeamHelper.locateUser(user.lastLat, user.lastLng)
                       : null,
                 ),
+                const SizedBox(height: 12),
+                // Tente (campement) : icône dédiée pour ne pas confondre avec la
+                // position courante. Grisée tant qu'aucune tente n'est enregistrée.
+                _ContactTile(
+                  icon: Icons.cabin, // repli ; iconWidget (FaIcon) est utilisé
+                  iconWidget: FaIcon(FontAwesomeIcons.campground,
+                      color: AppTheme.accent, size: 18),
+                  title: 'Tente',
+                  value: hasTent
+                      ? 'Campement enregistré'
+                      : 'Aucune tente enregistrée',
+                  actionLabel: 'Rejoindre',
+                  onTap: hasTent
+                      ? () => TeamHelper.navigateToTent(
+                          user.tentLat, user.tentLng)
+                      : null,
+                ),
 
                 const SizedBox(height: 32),
 
@@ -178,6 +197,8 @@ class UserProfilePage extends StatelessWidget {
 // fini les icônes dupliquées (pin + flèche, combiné + appel).
 class _ContactTile extends StatelessWidget {
   final IconData icon;
+  /// Icône personnalisée (ex. FaIcon FontAwesome) ; si fournie, remplace [icon].
+  final Widget? iconWidget;
   final String title;
   final String value;
   final String actionLabel;
@@ -185,6 +206,7 @@ class _ContactTile extends StatelessWidget {
 
   const _ContactTile({
     required this.icon,
+    this.iconWidget,
     required this.title,
     required this.value,
     required this.actionLabel,
@@ -207,11 +229,13 @@ class _ContactTile extends StatelessWidget {
               Container(
                 width: 42,
                 height: 42,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppTheme.accent.withValues(alpha: 0.18),
                 ),
-                child: Icon(icon, color: AppTheme.accent, size: 20),
+                child: iconWidget ??
+                    Icon(icon, color: AppTheme.accent, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(

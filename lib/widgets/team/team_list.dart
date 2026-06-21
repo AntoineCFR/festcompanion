@@ -6,6 +6,7 @@ class TeamList extends StatelessWidget {
   final List<User> users;
   final void Function(String) onCallPressed;
   final void Function(double?, double?) onLocatePressed;
+  final void Function(double?, double?) onTentPressed;
   /// Appelé quand l'utilisateur tape sur une carte (navigation vers le profil).
   final void Function(User)? onTap;
 
@@ -14,6 +15,7 @@ class TeamList extends StatelessWidget {
     required this.users,
     required this.onCallPressed,
     required this.onLocatePressed,
+    required this.onTentPressed,
     this.onTap,
   });
 
@@ -31,6 +33,7 @@ class TeamList extends StatelessWidget {
           user: user,
           onCallPressed: onCallPressed,
           onLocatePressed: onLocatePressed,
+          onTentPressed: onTentPressed,
           onTap: onTap != null ? () => onTap!(user) : null,
         );
       },

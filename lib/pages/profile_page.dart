@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../services/app_data_manager.dart';
 import '../models/user_model.dart';
 import '../models/profile_data_model.dart';
+import '../utils/utils.dart';
 import '../widgets/profile/profile_app_bar.dart';
 import '../widgets/profile/profile_photo.dart';
 import '../widgets/profile/profile_text_field.dart';
@@ -31,6 +33,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true; // ✅ État de chargement explicite
   bool _isEditingPhone = false; // mode édition du numéro (Éditer → Valider)
   bool _isSavingPhone = false; // sauvegarde du numéro en cours
+  bool _isSavingTent = false; // acquisition/sauvegarde de la tente en cours
 
   void _showSnackBar(String message) {
     AppDataManager().showSnackBar(message);
@@ -63,9 +66,79 @@ class _ProfilePageState extends State<ProfilePage> {
     // inutiles à chaque dataRevision).
     if (user.phoneNumber != _profileData!.phoneNumber ||
         user.lastLat != _profileData!.latitude ||
-        user.lastLng != _profileData!.longitude) {
+        user.lastLng != _profileData!.longitude ||
+        user.tentLat != _profileData!.user.tentLat ||
+        user.tentLng != _profileData!.user.tentLng) {
       setState(() => _profileData = _profileData!.copyWith(user: user));
     }
+  }
+
+  /// Capture la position GPS courante comme emplacement de la tente (campement).
+  Future<void> _captureTent() async {
+    if (_isSavingTent) return;
+    setState(() => _isSavingTent = true);
+    _showSnackBar('Acquisition de la position de votre tente…');
+    try {
+      await ProfileHelper.saveTentLocation(widget.userId);
+      if (!mounted) return;
+      setState(() {
+        _profileData = _profileData?.copyWith(
+          user: AppDataManager().users.firstWhere(
+            (u) => u.id == widget.userId,
+            orElse: () => _profileData!.user,
+          ),
+        );
+        _isSavingTent = false;
+      });
+      _showSnackBar('Emplacement de votre tente enregistré !');
+    } catch (e) {
+      if (mounted) setState(() => _isSavingTent = false);
+      _showSnackBar('Impossible d\'enregistrer la tente (position indisponible).');
+    }
+  }
+
+  /// Section « Tente » : capture/maj de l'emplacement du campement.
+  Widget _buildTentSection() {
+    final user = _profileData!.user;
+    final hasTent = AppUtils.hasValidLocation(user.tentLat, user.tentLng);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const FaIcon(FontAwesomeIcons.campground,
+                color: Colors.white70, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              hasTent ? 'Tente enregistrée' : 'Tente non enregistrée',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: _isSavingTent ? null : _captureTent,
+          icon: _isSavingTent
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const FaIcon(FontAwesomeIcons.campground, size: 16),
+          label: Text(
+              hasTent ? 'Mettre à jour ma tente' : 'Enregistrer ma tente ici'),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Place-toi à ta tente puis enregistre. Surtout utile pour TE guider '
+          'jusqu\'à ton lit au retour de la dernière scène, quand ton sens de '
+          'l\'orientation aura, disons, pris sa soirée. Accessoirement, tes amis '
+          'pourront aussi te rejoindre.',
+          style: TextStyle(color: Colors.white38, fontSize: 11.5),
+        ),
+      ],
+    );
   }
 
   /// Affichage IMMÉDIAT depuis le cache local (le user est déjà chargé au
@@ -334,6 +407,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   latitude: profile.latitude,
                   longitude: profile.longitude,
                 ),
+                const SizedBox(height: 20),
+                _buildTentSection(),
                 const SizedBox(height: 20),
               ],
             ),

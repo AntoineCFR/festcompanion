@@ -8,6 +8,7 @@ class UserCard extends StatelessWidget {
   final User user;
   final void Function(String) onCallPressed;
   final void Function(double?, double?) onLocatePressed;
+  final void Function(double?, double?) onTentPressed;
   /// Navigation vers le profil de l'utilisateur (optionnel).
   final VoidCallback? onTap;
 
@@ -16,6 +17,7 @@ class UserCard extends StatelessWidget {
     required this.user,
     required this.onCallPressed,
     required this.onLocatePressed,
+    required this.onTentPressed,
     this.onTap,
   });
 
@@ -69,8 +71,11 @@ class UserCard extends StatelessWidget {
                 phoneNumber: user.phoneNumber,
                 latitude: user.lastLat,
                 longitude: user.lastLng,
+                tentLat: user.tentLat,
+                tentLng: user.tentLng,
                 onCallPressed: onCallPressed,
                 onLocatePressed: onLocatePressed,
+                onTentPressed: onTentPressed,
               ),
             ],
           ),

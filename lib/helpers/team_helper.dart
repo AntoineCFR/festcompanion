@@ -35,4 +35,21 @@ class TeamHelper {
       AppDataManager().showSnackBar('Impossible d\'ouvrir la carte.');
     }
   }
+
+  /// Ouvre Google Maps en mode ITINÉRAIRE vers une destination (ex. la tente
+  /// d'un ami sur le camping) → guidage depuis la position courante.
+  static Future<void> navigateToTent(double? lat, double? lng) async {
+    if (lat == null || lng == null) {
+      AppDataManager().showSnackBar('Aucune tente enregistrée.');
+      return;
+    }
+
+    final url = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+    try {
+      await launchUrl(url);
+    } catch (e) {
+      AppDataManager().showSnackBar('Impossible d\'ouvrir la carte.');
+    }
+  }
 }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/dj_tag.dart';
 import '../../models/user_model.dart';
 import '../../services/app_data_manager.dart';
-import '../../pages/tag_browser_page.dart';
+import '../../pages/search_page.dart';
 import '../team/user_avatar.dart';
 
 /// Section « Tags » de la fiche DJ. Tout utilisateur peut ajouter un tag
@@ -143,7 +143,7 @@ class _TagsSectionState extends State<TagsSection> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => TagBrowserPage(initialTag: tag.tag),
+          builder: (_) => SearchPage(initialTag: tag.tag),
         ),
       );
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/app_data_manager.dart';
 import '../services/auth_service.dart';
 import '../helpers/featured_helper.dart';
 import 'login_page.dart';
@@ -8,7 +9,7 @@ import 'events_page.dart';
 import 'lineup_page.dart';
 import 'timetable_page.dart';
 import 'trending_page.dart';
-import 'tag_browser_page.dart';
+import 'search_page.dart';
 import '../widgets/main/main_drawer.dart';
 import '../widgets/main/main_app_bar.dart';
 import '../widgets/main/main_bottom_nav_bar.dart';
@@ -39,7 +40,40 @@ class _MainScreenState extends State<MainScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
+  void initState() {
+    super.initState();
+    // Intent de navigation laissé par le tap d'une notification locale
+    // (ex. rappel de set → onglet Live). On consomme la valeur déjà posée
+    // (lancement depuis l'état terminé) et on écoute les suivantes (app vivante).
+    pendingTabIntent.addListener(_handleTabIntent);
+    if (pendingTabIntent.value != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _handleTabIntent());
+    }
+  }
+
+  void _handleTabIntent() {
+    final intent = pendingTabIntent.value;
+    if (intent == null || !mounted) return;
+    pendingTabIntent.value = null; // consommé
+    switch (intent) {
+      case 'live':
+        _goToLanding(LandingMode.featured);
+      case 'events':
+        _goToTab(1); // onglet Events (déclarer sa conso depuis le rappel hydratation)
+    }
+  }
+
+  void _goToTab(int index) {
+    setState(() {
+      _currentIndex = index;
+      _landingMode = LandingMode.auto;
+    });
+    _pageController.jumpToPage(index);
+  }
+
+  @override
   void dispose() {
+    pendingTabIntent.removeListener(_handleTabIntent);
     _pageController.dispose();
     super.dispose();
   }
@@ -106,7 +140,7 @@ class _MainScreenState extends State<MainScreen> {
           LineupPage(username: widget.username, userId: widget.userId),
           TimetablePage(username: widget.username, userId: widget.userId),
           const TrendingView(),
-          const TagBrowserView(),
+          const SearchView(),
         ],
       ),
       bottomNavigationBar: MainBottomNavBar(

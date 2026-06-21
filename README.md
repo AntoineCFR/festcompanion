@@ -79,7 +79,7 @@ This repository contains the **Flutter client**. The companion REST API lives in
 ### 🏷️ Collaborative DJ tags
 - Any user can add free-text **tags** (no spaces, auto-prefixed with `#`) to a set; everyone sees them, each chip carrying its author's avatar — like the notes.
 - Tap your own tag to remove it (with confirmation).
-- A dedicated **"DJ by tag"** screen lets you pick any existing tag and browse every DJ that matches it.
+- The **Search** tab lets you find DJs by name (also stage, day or tag) and/or pick any existing tag to browse every DJ that matches — text and tag filters combine.
 
 ### 📈 Trending (best-rated DJs)
 - A **"Trending"** screen ranks the festival's DJs by a **Bayesian average** of the group's ratings, so a set with many good ratings outranks one with a single perfect score.
@@ -265,6 +265,123 @@ Ideas not yet implemented:
 ---
 
 ## Release notes
+
+### 1.6.0 — 2026-06-21
+- **Search tab (merged with Tags).** The bottom-nav *Tags* tab is now **Search**:
+  a search bar (matches DJ name first, also stage, day and tag) plus a row of
+  **filter buttons** — Day / Stage / Tags — each opening a multi-select sheet.
+  Filters combine (AND across categories, OR within one), so e.g. *Saturday +
+  Area V* works (day labels shown in French). Tapping a result opens the DJ
+  profile. Browses all DJs alphabetically by default; works even when no tags
+  exist yet.
+- **Cleaner Events screen.** Removed the redundant "Événements" header bar so the
+  tab is consistent with the rest of the app (it renders under the shared app bar
+  like the other tabs).
+- **Greyed-out "locate" when there's no real position.** Members whose location
+  is unset (the server's default `(0, 0)`, which would otherwise point off the
+  African coast) now show a disabled location pin in the Team list and on the
+  profile screen, instead of a tappable pin leading nowhere.
+- **Admin: manual stage coordinates.** Besides capturing the current GPS position,
+  admins can now type a stage corner / rally point's latitude & longitude by hand
+  (new "Saisie manuelle" button on each stage card), handy when configuring a
+  stage off-site.
+- **Snappier stage coordinate capture.** The confirmation dialog now opens
+  *immediately* on tap (before the slow GPS read), so rapid taps no longer stack
+  up multiple dialogs; a re-entry guard prevents concurrent writes. The dialog
+  also names the corner in plain French ("le coin avant-gauche", "le point de
+  ralliement") instead of the raw key.
+- **Find a friend's tent on the campsite.** Each member can save their tent's
+  GPS location from their own profile; others then get a "Rejoindre" action
+  (dedicated campground icon, distinct from the location pin) — both on the
+  member's profile and directly in the **Team** list — to be guided there in
+  Google Maps. Stored per festival. A day-0 push reminds everyone to save their
+  tent before the music starts.
+- **Gentle nudges to share location.** A graduated series of reminders (evening
+  before + every 3 h on day 0) encourages enabling location sharing, each with a
+  stronger reason (find your stage → better notifications → be found if lost →
+  safety). They appear in the Journal with their own icons.
+- **Drawer order.** *Journal* now sits right under *Live*. No separate search
+  entry — Search lives in the bottom bar.
+- **SOS events get their own Journal icon.** Real-time SOS/perdu/hype alerts now
+  appear in the in-app Journal (backed by the API change); the Journal renders a
+  dedicated **SOS** icon for `sos` entries instead of the generic bell. `hype`
+  and `lost` already had icons.
+
+### 1.5.8 — 2026-06-19
+- **Consent prompt reaches existing users too.** The default-on location consent
+  is now gated by a versioned marker, so the permission prompt fires once for
+  **everyone on the next update** (existing testers included, whose toggle was
+  off by default), not just on fresh installs. After it has run once, the saved
+  choice is respected and never re-asked.
+
+### 1.5.7 — 2026-06-19
+- **Location sharing on by default after permission.** On first launch the app
+  now asks for the OS location permission and, if granted, turns the
+  "share my location" toggle ON automatically (instead of defaulting to off and
+  requiring a manual flip).
+
+### 1.5.6 — 2026-06-19
+- **Set-reminder title tweak.** Favourite-set reminders now read “⏰ Get ready”
+  (was “Ça commence bientôt !”); the body is unchanged.
+
+### 1.5.5 — 2026-06-19
+- **Themed hydration reminders.** The every-2h hydration reminder is no longer a
+  single repeated line: each festival day now has its own escalating set of
+  messages, from earnest to unhinged — camel (day 1), cactus (day 2), water-rich
+  "fun fact" fruits that are conveniently never available on site (day 3). Texts
+  are picked per day (ordered by `day_int`) and per slot; the last line repeats
+  if a day has more slots than messages. All scheduled at festival-local time.
+
+### 1.5.4 — 2026-06-19
+- **Hydration reminder → Events.** Tapping the every-2h hydration reminder now
+  opens the **Events** tab (where you log your drinks) instead of just opening
+  the app.
+
+### 1.5.3 — 2026-06-19
+- **Per-type notification deep-links.** Tapping a notification now lands on the
+  right place: scheduled pushes → **Journal**; favourite-set reminders (~10 min
+  before a set) → **Live** (now/next); user events (SOS / lost / hype) keep
+  opening the app normally (main screen). Set reminders route via a small intent
+  picked up by the main screen, working from foreground, background, and a cold
+  launch from the notification.
+
+### 1.5.2 — 2026-06-19
+- **Tap a scheduled notification → opens the Journal.** Tapping any scheduled
+  push (daily spotlight, hourly gag, countdown, wrap-up — all carry
+  `event_type: journal`) now deep-links straight to the Journal screen, whether
+  the app was in the foreground, background, or terminated.
+
+### 1.5.1 — 2026-06-19
+- **Countdown pushes before the festival:** "J-N" notifications that ramp up as
+  the event approaches (J-30, J-21, J-14, J-10, J-7, J-5, J-3, J-2, J-1), each
+  fired once at 9 a.m. local. Some pull in the group's current top-rated DJs.
+  They run through the same tick/Journal pipeline, so they're **live-testable
+  right away** (no need to wait for the festival) and archived in the Journal
+  (new hourglass icon). Backend-only logic; the app just renders them.
+
+### 1.5.0 — 2026-06-19
+- **Scheduled festival pushes + "Journal":** the app now receives playful,
+  data-driven push notifications during the festival, all archived on a new
+  **Journal** screen (drawer entry). Each festival day: a morning "spotlight"
+  push at 8 a.m. naming the day's top-rated DJs (Bayesian trending, day-filtered),
+  hourly running gags between 9 a.m. and 1 p.m. that crown a group member from
+  the previous day's data (most "lost", biggest drinker + their favourite stage,
+  hydration champion, energy/hype records…) plus same-day "juror" (most ratings)
+  and "FOMO" (most favourites) awards, and a single wrap-up push the day after
+  with the weekend's full leaderboard. The Journal is **server-sourced** (same
+  for everyone, survives a missed push) with offline cache and pull-to-refresh;
+  leaderboard/wrap-up entries appear there without being pushed. Notifications
+  are gender-aware (new `gender` column on users). Backend-driven: one cron hits
+  `/api/push/tick` and the schedule/texts live server-side.
+
+### 1.4.0 — 2026-06-19
+- **Trending — filter by day:** the Trending ranking now has a segmented day
+  filter (**All** / Friday / Saturday / Sunday, built from the festival's actual
+  days). Selecting a day shows only the sets scheduled that day, re-numbered from
+  rank 1; the Bayesian score itself is still computed across the whole festival,
+  so the filter only changes which sets are visible. The filter **always resets
+  to "All"** each time you open the Trending tab. A dedicated empty state shows
+  when a day has no rated sets yet.
 
 ### 1.3.2 — 2026-06-15
 - **Fix:** the "Mon compte" screen no longer blocks behind a centred spinner on

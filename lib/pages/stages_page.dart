@@ -25,6 +25,9 @@ class _StagesPageState extends State<StagesPage> {
   List<Stage> _stages = [];
   bool _isLoading = true;
   String? _userRole;
+  // Garde anti-réentrance : empêche les acquisitions/écritures concurrentes
+  // (clics répétés → dialogs empilés / sauvegardes en double).
+  bool _busy = false;
 
   @override
   void initState() {
@@ -86,110 +89,147 @@ class _StagesPageState extends State<StagesPage> {
 
   bool get _isAdmin => _userRole == 'admin';
 
-  Future<void> _setCoordinates(String stageName, String corner) async {
-    // Vérifie que le widget est toujours monté AVANT toute opération async
-    if (!mounted) return;
+  /// Tournure lisible du coin pour le message de confirmation.
+  String _cornerPhrase(String corner) {
+    switch (corner) {
+      case 'avg':
+        return 'le coin avant-gauche';
+      case 'avd':
+        return 'le coin avant-droit';
+      case 'arg':
+        return 'le coin arrière-gauche';
+      case 'ard':
+        return 'le coin arrière-droit';
+      case 'rally':
+        return 'le point de ralliement';
+    }
+    return 'ce point';
+  }
 
+  Future<void> _setCoordinates(String stageName, String corner) async {
+    if (_busy) return; // un clic à la fois
+
+    // Confirmation AVANT l'acquisition GPS : le dialog s'ouvre instantanément
+    // (réactif) et sa barrière modale empêche les clics suivants → plus de
+    // dialogs empilés. L'acquisition (lente) n'a lieu qu'APRÈS confirmation.
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Confirmer'),
+        content: Text(
+          'Voulez-vous définir la position actuelle pour '
+          '${_cornerPhrase(corner)} de la scène $stageName ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _busy = true);
+    AppDataManager().showSnackBar('Acquisition de votre position…');
     try {
       final currentLocation = await LocationHelper.tryGetCurrentPosition();
       if (currentLocation == null) {
         AppDataManager().showSnackBar('Impossible de récupérer votre position.');
         return;
       }
-
-      // Vérifie à nouveau avant d'ouvrir la dialog
-      if (!mounted) return;
-
-      // Demande de confirmation
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          title: const Text('Confirmer'),
-          content: Text(
-            'Voulez-vous définir la position actuelle pour le $corner de $stageName ?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Confirmer'),
-            ),
-          ],
-        ),
-      );
-
-      // Vérifie une dernière fois avant de modifier l'état
-      if (confirm != true || !mounted) return;
-
-      final stageIndex = _stages.indexWhere((s) => s.stage == stageName);
-      if (stageIndex == -1) return;
-
-      final stage = _stages[stageIndex];
-      final coordinates = <String, dynamic>{
-        'lat_avg': stage.latAvg,
-        'lon_avg': stage.lonAvg,
-        'lat_avd': stage.latAvd,
-        'lon_avd': stage.lonAvd,
-        'lat_arg': stage.latArg,
-        'lon_arg': stage.lonArg,
-        'lat_ard': stage.latArd,
-        'lon_ard': stage.lonArd,
-        'lat_rally_point': stage.latRallyPoint,
-        'lon_rally_point': stage.lonRallyPoint,
-      };
-
-      // Met à jour selon le coin
-      switch (corner) {
-        case 'avd':
-          coordinates['lat_avd'] = currentLocation.latitude;
-          coordinates['lon_avd'] = currentLocation.longitude;
-          break;
-        case 'avg':
-          coordinates['lat_avg'] = currentLocation.latitude;
-          coordinates['lon_avg'] = currentLocation.longitude;
-          break;
-        case 'arg':
-          coordinates['lat_arg'] = currentLocation.latitude;
-          coordinates['lon_arg'] = currentLocation.longitude;
-          break;
-        case 'ard':
-          coordinates['lat_ard'] = currentLocation.latitude;
-          coordinates['lon_ard'] = currentLocation.longitude;
-          break;
-        case 'rally':
-          coordinates['lat_rally_point'] = currentLocation.latitude;
-          coordinates['lon_rally_point'] = currentLocation.longitude;
-          break;
-      }
-
-      await AppDataManager().updateStage(stageName, coordinates);
-
-      // Vérifie une dernière fois avant setState
-      if (!mounted) return;
-
-      setState(() {
-        _stages[stageIndex] = stage.copyWith(
-          latAvg: corner == 'avg' ? currentLocation.latitude : stage.latAvg,
-          lonAvg: corner == 'avg' ? currentLocation.longitude : stage.lonAvg,
-          latAvd: corner == 'avd' ? currentLocation.latitude : stage.latAvd,
-          lonAvd: corner == 'avd' ? currentLocation.longitude : stage.lonAvd,
-          latArg: corner == 'arg' ? currentLocation.latitude : stage.latArg,
-          lonArg: corner == 'arg' ? currentLocation.longitude : stage.lonArg,
-          latArd: corner == 'ard' ? currentLocation.latitude : stage.latArd,
-          lonArd: corner == 'ard' ? currentLocation.longitude : stage.lonArd,
-          latRallyPoint: corner == 'rally' ? currentLocation.latitude : stage.latRallyPoint,
-          lonRallyPoint: corner == 'rally' ? currentLocation.longitude : stage.lonRallyPoint,
-        );
-      });
-      AppDataManager().showSnackBar('Coordonnées mises à jour !');
+      await _applyCorner(stageName, corner, currentLocation.latitude,
+          currentLocation.longitude);
     } catch (e) {
-      if (mounted) {
-        AppDataManager().showSnackBar('Erreur: $e');
-      }
+      if (mounted) AppDataManager().showSnackBar('Erreur: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Saisie manuelle (admin) : applique directement les coordonnées tapées (le
+  /// dialog de saisie tient lieu de confirmation).
+  Future<void> _setCoordinatesManual(
+      String stageName, String corner, double lat, double lng) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await _applyCorner(stageName, corner, lat, lng);
+    } catch (e) {
+      if (mounted) AppDataManager().showSnackBar('Erreur: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Écrit la paire (lat, lng) sur un coin/ralliement d'une scène : persiste via
+  /// l'API puis met à jour l'état local. Commun aux deux saisies (GPS / manuelle).
+  Future<void> _applyCorner(
+      String stageName, String corner, double lat, double lng) async {
+    final stageIndex = _stages.indexWhere((s) => s.stage == stageName);
+    if (stageIndex == -1) return;
+
+    final stage = _stages[stageIndex];
+    final coordinates = <String, dynamic>{
+      'lat_avg': stage.latAvg,
+      'lon_avg': stage.lonAvg,
+      'lat_avd': stage.latAvd,
+      'lon_avd': stage.lonAvd,
+      'lat_arg': stage.latArg,
+      'lon_arg': stage.lonArg,
+      'lat_ard': stage.latArd,
+      'lon_ard': stage.lonArd,
+      'lat_rally_point': stage.latRallyPoint,
+      'lon_rally_point': stage.lonRallyPoint,
+    };
+
+    // Met à jour selon le coin
+    switch (corner) {
+      case 'avd':
+        coordinates['lat_avd'] = lat;
+        coordinates['lon_avd'] = lng;
+        break;
+      case 'avg':
+        coordinates['lat_avg'] = lat;
+        coordinates['lon_avg'] = lng;
+        break;
+      case 'arg':
+        coordinates['lat_arg'] = lat;
+        coordinates['lon_arg'] = lng;
+        break;
+      case 'ard':
+        coordinates['lat_ard'] = lat;
+        coordinates['lon_ard'] = lng;
+        break;
+      case 'rally':
+        coordinates['lat_rally_point'] = lat;
+        coordinates['lon_rally_point'] = lng;
+        break;
+    }
+
+    await AppDataManager().updateStage(stageName, coordinates);
+
+    if (!mounted) return;
+
+    setState(() {
+      _stages[stageIndex] = stage.copyWith(
+        latAvg: corner == 'avg' ? lat : stage.latAvg,
+        lonAvg: corner == 'avg' ? lng : stage.lonAvg,
+        latAvd: corner == 'avd' ? lat : stage.latAvd,
+        lonAvd: corner == 'avd' ? lng : stage.lonAvd,
+        latArg: corner == 'arg' ? lat : stage.latArg,
+        lonArg: corner == 'arg' ? lng : stage.lonArg,
+        latArd: corner == 'ard' ? lat : stage.latArd,
+        lonArd: corner == 'ard' ? lng : stage.lonArd,
+        latRallyPoint: corner == 'rally' ? lat : stage.latRallyPoint,
+        lonRallyPoint: corner == 'rally' ? lng : stage.lonRallyPoint,
+      );
+    });
+    AppDataManager().showSnackBar('Coordonnées mises à jour !');
   }
 
   void _openInGoogleMaps(double lat, double lng) async {
@@ -235,6 +275,7 @@ class _StagesPageState extends State<StagesPage> {
           stage: stage,
           isAdmin: _isAdmin,
           onSetCoordinates: _setCoordinates,
+          onSetCoordinatesManual: _setCoordinatesManual,
           onOpenInMaps: _openInGoogleMaps,
         );
       },

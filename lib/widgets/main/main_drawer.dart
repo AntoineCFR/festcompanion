@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../pages/profile_page.dart';
 import '../../pages/team_page.dart';
 import '../../pages/stages_page.dart';
+import '../../pages/journal_page.dart';
 import '../../pages/festival_selection_page.dart';
 import '../../pages/theme_page.dart';
 import '../../services/app_data_manager.dart';
@@ -99,6 +100,10 @@ class MainDrawer extends StatelessWidget {
                 Navigator.pop(context);
                 onShowFeatured();
               }),
+          _tile(context,
+              icon: Icons.auto_stories,
+              label: 'Journal',
+              onTap: () => _push(context, const JournalPage())),
           _tile(context,
               icon: Icons.group,
               label: 'Équipe',

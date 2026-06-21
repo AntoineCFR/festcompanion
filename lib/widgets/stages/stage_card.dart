@@ -14,6 +14,8 @@ class StageCard extends StatefulWidget {
   final Stage stage;
   final bool isAdmin;
   final Function(String, String) onSetCoordinates;
+  /// Saisie manuelle : (nom de scène, coin, latitude, longitude).
+  final Function(String, String, double, double) onSetCoordinatesManual;
   final Function(double, double) onOpenInMaps;
   final bool initiallyExpanded;
 
@@ -22,6 +24,7 @@ class StageCard extends StatefulWidget {
     required this.stage,
     required this.isAdmin,
     required this.onSetCoordinates,
+    required this.onSetCoordinatesManual,
     required this.onOpenInMaps,
     this.initiallyExpanded = false,
   });
@@ -343,7 +346,8 @@ class _StageCardState extends State<StageCard> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Place-toi à l\'endroit voulu, puis enregistre-le comme repère.',
+          'Place-toi à l\'endroit voulu puis enregistre-le, ou saisis les '
+          'coordonnées manuellement.',
           style: TextStyle(color: Colors.white38, fontSize: 11.5),
         ),
         const SizedBox(height: 12),
@@ -357,6 +361,20 @@ class _StageCardState extends State<StageCard> {
             _setChip('Arrière-D.', 'ard'),
             _setChip('Ralliement', 'rally', highlight: true),
           ],
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _openManualEntry,
+            icon: const Icon(Icons.edit_location_alt, size: 16),
+            label: const Text('Saisie manuelle'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white24),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
         ),
         const SizedBox(height: 14),
         _buildCoordTable(),
@@ -391,6 +409,139 @@ class _StageCardState extends State<StageCard> {
         ),
       ),
     );
+  }
+
+  /// Coordonnées actuelles d'un coin/ralliement (pour pré-remplir la saisie).
+  (double, double) _cornerValue(String corner) {
+    switch (corner) {
+      case 'avg':
+        return (stage.latAvg, stage.lonAvg);
+      case 'avd':
+        return (stage.latAvd, stage.lonAvd);
+      case 'arg':
+        return (stage.latArg, stage.lonArg);
+      case 'ard':
+        return (stage.latArd, stage.lonArd);
+      case 'rally':
+        return (stage.latRallyPoint, stage.lonRallyPoint);
+    }
+    return (0, 0);
+  }
+
+  /// Dialog de saisie manuelle : choix du coin + latitude/longitude tapées.
+  /// Pré-remplit avec la valeur existante du coin si elle est définie.
+  Future<void> _openManualEntry() async {
+    String corner = 'rally';
+    final latCtrl = TextEditingController();
+    final lngCtrl = TextEditingController();
+    String? error;
+
+    void prefill() {
+      final (lat, lng) = _cornerValue(corner);
+      final isSet = lat != 0 || lng != 0;
+      latCtrl.text = isSet ? lat.toStringAsFixed(6) : '';
+      lngCtrl.text = isSet ? lng.toStringAsFixed(6) : '';
+    }
+
+    prefill();
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: Text(
+            'Saisie manuelle · ${stage.stage}',
+            style: const TextStyle(color: Colors.white, fontSize: 17),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButton<String>(
+                  value: corner,
+                  isExpanded: true,
+                  dropdownColor: AppTheme.surface,
+                  style: const TextStyle(color: Colors.white),
+                  items: const [
+                    DropdownMenuItem(value: 'avg', child: Text('Avant-Gauche')),
+                    DropdownMenuItem(value: 'avd', child: Text('Avant-Droit')),
+                    DropdownMenuItem(
+                        value: 'arg', child: Text('Arrière-Gauche')),
+                    DropdownMenuItem(value: 'ard', child: Text('Arrière-Droit')),
+                    DropdownMenuItem(value: 'rally', child: Text('Ralliement')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    corner = v;
+                    prefill();
+                    setDialogState(() => error = null);
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: latCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true, signed: true),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Latitude',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                TextField(
+                  controller: lngCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true, signed: true),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Longitude',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!,
+                      style: const TextStyle(
+                          color: Colors.redAccent, fontSize: 12)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () {
+                final lat =
+                    double.tryParse(latCtrl.text.trim().replaceAll(',', '.'));
+                final lng =
+                    double.tryParse(lngCtrl.text.trim().replaceAll(',', '.'));
+                if (lat == null ||
+                    lng == null ||
+                    lat < -90 ||
+                    lat > 90 ||
+                    lng < -180 ||
+                    lng > 180) {
+                  setDialogState(() => error =
+                      'Coordonnées invalides (lat ∈ [-90, 90], lng ∈ [-180, 180]).');
+                  return;
+                }
+                Navigator.pop(ctx);
+                widget.onSetCoordinatesManual(stage.stage, corner, lat, lng);
+              },
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    latCtrl.dispose();
+    lngCtrl.dispose();
   }
 
   Widget _buildCoordTable() {

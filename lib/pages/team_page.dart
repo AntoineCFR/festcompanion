@@ -81,6 +81,8 @@ class _TeamPageState extends State<TeamPage> {
                     onCallPressed: (phone) => TeamHelper.callUser(phone),
                     onLocatePressed: (lat, lng) =>
                         TeamHelper.locateUser(lat, lng),
+                    onTentPressed: (lat, lng) =>
+                        TeamHelper.navigateToTent(lat, lng),
                     onTap: (User user) => Navigator.push(
                       context,
                       MaterialPageRoute(

@@ -6,6 +6,7 @@ import '../models/user_favorite.dart';
 import '../models/stage_model.dart';
 import '../models/festival_model.dart';
 import '../models/dj_tag.dart';
+import '../models/journal_entry.dart';
 
 class ApiService {
   static const String _baseUrl = 'https://extremalineup.onrender.com';
@@ -203,6 +204,10 @@ class ApiService {
           'last_lat': user['last_lat'] ?? 0.0,
           'last_lng': user['last_lng'] ?? 0.0,
           'last_location': user['last_location'] ?? '?',
+          // Tente : on garde le null (pas de défaut (0,0)) pour distinguer
+          // « pas de tente » d'une vraie position.
+          'tent_lat': user['tent_lat'],
+          'tent_lng': user['tent_lng'],
           'user_role': user['user_role'] ?? 'user',
         }).toList();
       } else {
@@ -238,6 +243,28 @@ class ApiService {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/users/$userId/location');
+      final response = await _client.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'lat': lat, 'lng': lng}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Erreur: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Erreur de connexion: $e');
+    }
+  }
+
+  /// Enregistre l'emplacement de la tente (campement) de l'utilisateur sur le
+  /// festival courant.
+  static Future<Map<String, dynamic>> updateUserTent(int userId, double lat, double lng, {int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/users/$userId/tent');
       final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -361,6 +388,29 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Échec du chargement des tags: $e');
+    }
+  }
+
+  /// Récupère le journal des notifications programmées d'un festival
+  /// (les plus récentes d'abord).
+  static Future<List<JournalEntry>> fetchJournal({int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/api/journal?festival_id=$fid');
+      final response = await _getWithRetry(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final list = data['journal'] as List;
+        return list
+            .map((e) => JournalEntry.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } else {
+        throw Exception(
+            'Échec fetchJournal: Status ${response.statusCode} - Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Échec du chargement du journal: $e');
     }
   }
 

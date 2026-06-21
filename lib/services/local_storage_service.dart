@@ -4,6 +4,7 @@ import '../models/timetable_item.dart';
 import '../models/user_model.dart';
 import '../models/user_favorite.dart';
 import '../models/dj_tag.dart';
+import '../models/journal_entry.dart';
 import '../models/stage_model.dart';
 import '../models/festival_model.dart';
 import '../models/event_model.dart';
@@ -16,6 +17,7 @@ class LocalStorageService {
   static const String _userFavoritesKey = 'userFavorites';
   static const String _allUserFavoritesKey = 'allUserFavorites';
   static const String _djTagsKey = 'djTags';
+  static const String _journalKey = 'journal';
   static const String _photoUrlsKey = 'photoUrls';
   static const String _usersKey = 'users';
   static const String _timetableKey = 'timetable';
@@ -119,6 +121,21 @@ class LocalStorageService {
     if (list == null) return [];
     return list
         .map((s) => DjTag.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ========== JOURNAL (notifications programmées ; par festival) ==========
+
+  Future<void> saveJournal(List<JournalEntry> entries, int festivalId) async {
+    final list = entries.map((e) => jsonEncode(e.toJson())).toList();
+    await _prefs.setStringList('${_journalKey}_$festivalId', list);
+  }
+
+  Future<List<JournalEntry>> getJournal(int festivalId) async {
+    final list = _prefs.getStringList('${_journalKey}_$festivalId');
+    if (list == null) return [];
+    return list
+        .map((s) => JournalEntry.fromJson(jsonDecode(s) as Map<String, dynamic>))
         .toList();
   }
 

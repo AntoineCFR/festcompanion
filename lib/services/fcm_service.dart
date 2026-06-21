@@ -1,7 +1,8 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'app_data_manager.dart';
+import '../pages/journal_page.dart';
 import '../helpers/profile_helper.dart';
 
 /// Centralise l'initialisation FCM et l'affichage des notifications.
@@ -88,9 +89,24 @@ class FcmService {
 
   static void _onMessageOpened(RemoteMessage message) {
     _reportLocationIfRequested(message);
-    if (message.data['event_type'] == 'perdu') {
+    final eventType = message.data['event_type'];
+    if (eventType == 'perdu') {
       AppDataManager().loadUsers().ignore();
+    } else if (eventType == 'journal') {
+      // Notif programmée (push quotidienne, vanne, décompte, clôture) → Journal.
+      _openJournal();
     }
+  }
+
+  /// Ouvre la page Journal via le navigateur global. Différé d'une frame :
+  /// au lancement depuis l'état terminé (getInitialMessage), le navigateur peut
+  /// ne pas être encore monté à l'instant du tap.
+  static void _openJournal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const JournalPage()),
+      );
+    });
   }
 
   static Future<void> _initLocalNotifications() async {
@@ -104,6 +120,11 @@ class FcmService {
 
     await _localNotifications.initialize(
       const InitializationSettings(android: androidSettings, iOS: iosSettings),
+      // Tap sur une notif AFFICHÉE AU PREMIER PLAN (notif locale) : le payload
+      // porte l'event_type → on route vers le Journal pour les notifs programmées.
+      onDidReceiveNotificationResponse: (response) {
+        if (response.payload == 'journal') _openJournal();
+      },
     );
   }
 
@@ -148,6 +169,9 @@ class FcmService {
           presentSound: true,
         ),
       ),
+      // Payload = event_type → permet au tap (onDidReceiveNotificationResponse)
+      // de router vers le Journal pour les notifs programmées.
+      payload: eventType,
     );
   }
 }

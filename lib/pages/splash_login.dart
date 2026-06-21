@@ -42,7 +42,11 @@ class _SplashLoginState extends State<SplashLogin> {
     // ce sont des effets de bord, inutile de retarder l'écran principal.
     await AppDataManager().loadFavorites(widget.userId);
     FcmService.init();
-    ProfileHelper.refreshLocationIfEnabled(widget.userId);
+    // Premier lancement : demande la permission de localisation et active le
+    // partage par défaut si acceptée (sinon off). Non bloquant ; on rafraîchit
+    // la position une fois le consentement résolu. Lancements suivants : no-op.
+    ProfileHelper.ensureFirstRunLocationConsent()
+        .then((_) => ProfileHelper.refreshLocationIfEnabled(widget.userId));
     // Planifie les rappels locaux (sets favoris + hydratation) en arrière-plan.
     NotificationScheduler.rescheduleAll(widget.userId);
   }

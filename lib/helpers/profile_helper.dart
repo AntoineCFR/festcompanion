@@ -14,6 +14,12 @@ class ProfileHelper {
     await LocationHelper.setLocationEnabled(value);
   }
 
+  /// Premier lancement : demande la permission OS et active le partage par
+  /// défaut si l'utilisateur accepte (sinon off). Sans effet ensuite.
+  static Future<void> ensureFirstRunLocationConsent() async {
+    await LocationHelper.initFirstRunConsent();
+  }
+
   // Initialisation des données utilisateur
   static User initUserData(List<User> users, int userId, String username) {
     return users.firstWhere(
@@ -76,6 +82,14 @@ class ProfileHelper {
     } catch (_) {
       // Best-effort : on n'interrompt rien si la position n'est pas dispo.
     }
+  }
+
+  /// Capture la position GPS courante et l'enregistre comme emplacement de la
+  /// tente (campement) de l'utilisateur — distinct de sa position courante.
+  static Future<void> saveTentLocation(int userId) async {
+    final position = await LocationHelper.getCurrentPosition();
+    await ApiService.updateUserTent(userId, position.latitude, position.longitude);
+    AppDataManager().updateUserTent(userId, position.latitude, position.longitude);
   }
 
   // Sauvegarde du numéro de téléphone

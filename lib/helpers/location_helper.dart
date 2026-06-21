@@ -12,6 +12,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 class LocationHelper {
   // ========== CONSTANTES ==========
   static const String _locationEnabledKey = 'location_enabled';
+  // Marqueur de la demande de consentement « par défaut ». Versionné : poser une
+  // NOUVELLE valeur (v3, v4…) re-déclenche la demande une fois pour TOUT LE MONDE
+  // à la prochaine MAJ (utilisateurs existants compris, dont la clé
+  // `location_enabled` valait déjà false). Une fois posé, plus aucune re-demande.
+  static const String _consentPromptKey = 'location_consent_prompt_v2';
 
   // ========== PERMISSIONS ==========
 
@@ -107,6 +112,28 @@ class LocationHelper {
   static Future<void> setLocationEnabled(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_locationEnabledKey, value);
+  }
+
+  /// Demande de consentement « par défaut », jouée UNE fois (gardée par
+  /// [_consentPromptKey]) : demande la permission OS de localisation et active le
+  /// partage si l'utilisateur accepte. Comme le marqueur est versionné, cette
+  /// demande tombe aussi sur les utilisateurs EXISTANTS à la prochaine MAJ (dont
+  /// le toggle valait false par défaut). Une fois jouée, on ne redemande plus —
+  /// les choix manuels ultérieurs sont donc respectés.
+  static Future<void> initFirstRunConsent() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_consentPromptKey) ?? false) return; // déjà demandé
+
+    bool granted = false;
+    try {
+      final permission = await requestPermission();
+      granted = permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always;
+    } catch (_) {
+      granted = false;
+    }
+    await prefs.setBool(_locationEnabledKey, granted);
+    await prefs.setBool(_consentPromptKey, true);
   }
 
   // ========== GOOGLE MAPS ==========

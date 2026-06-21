@@ -37,6 +37,11 @@ class TrendingView extends StatefulWidget {
 }
 
 class _TrendingViewState extends State<TrendingView> {
+  /// Jour sélectionné dans le filtre (clé anglaise minuscule, ex. 'friday').
+  /// `null` = « Tous ». Initialisé à null → comme le PageView recrée la vue à
+  /// chaque arrivée sur l'onglet, le filtre repart TOUJOURS sur « Tous ».
+  String? _selectedDay;
+
   Future<void> _openDj(TimetableItem item) async {
     await Navigator.push(
       context,
@@ -102,41 +107,102 @@ class _TrendingViewState extends State<TrendingView> {
       return FestivalBackground(imageKey: 'featured', child: child);
     }
 
+    // Filtre par jour : le classement (et son score bayésien) reste calculé sur
+    // TOUTES les notes du festival ; on ne fait que masquer les sets des autres
+    // jours et renuméroter les rangs sur la liste affichée.
+    final days = AppDataManager().festivalDays;
+    final visible = _selectedDay == null
+        ? ranking
+        : ranking
+            .where((e) => e.item.day.toLowerCase() == _selectedDay)
+            .toList();
+
     return FestivalBackground(
       imageKey: 'featured',
       refreshDomains: const [LoadDomain.trending],
       refreshLabel: 'Mise à jour des tendances…',
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-        itemCount: ranking.length + 1,
+        // +1 pour l'en-tête ; si le jour filtré n'a aucun set noté, on réserve
+        // une ligne pour le message « aucune note ce jour-là ».
+        itemCount: visible.isEmpty ? 2 : visible.length + 1,
         itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8, left: 6),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Les DJs les mieux notés par le groupe',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.info_outline, color: Colors.white70),
-                  tooltip: 'Comment est calculé ce classement ?',
-                  onPressed: _showInfo,
-                ),
-              ],
-            ),
+          if (index == 0) {
+            return _buildHeader(days);
+          }
+          if (visible.isEmpty) {
+            return _buildEmptyDayState();
+          }
+          final entry = visible[index - 1];
+          return _TrendingTile(
+            rank: index,
+            entry: entry,
+            onTap: () => _openDj(entry.item),
           );
-        }
-        final entry = ranking[index - 1];
-        return _TrendingTile(
-          rank: index,
-          entry: entry,
-          onTap: () => _openDj(entry.item),
-        );
         },
+      ),
+    );
+  }
+
+  /// En-tête : ligne d'intro + bouton info, puis le filtre par jour (s'il y a
+  /// plus d'un jour au programme).
+  Widget _buildHeader(List<String> days) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Les DJs les mieux notés par le groupe',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.info_outline, color: Colors.white70),
+                tooltip: 'Comment est calculé ce classement ?',
+                onPressed: _showInfo,
+              ),
+            ],
+          ),
+          if (days.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 6),
+              child: _TrendingDayFilter(
+                days: days,
+                selectedDay: _selectedDay,
+                onChanged: (d) => setState(() => _selectedDay = d),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyDayState() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event_busy_outlined,
+              size: 48, color: Colors.white.withValues(alpha: 0.25)),
+          const SizedBox(height: 14),
+          const Text(
+            'Aucune note ce jour-là',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Les sets de ce jour n\'ont pas encore été notés.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+        ],
       ),
     );
   }
@@ -167,6 +233,73 @@ class _TrendingViewState extends State<TrendingView> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Filtre par jour (« Tous » + chaque jour du festival) ─────────────────────
+// Sélecteur segmenté ; `null` = « Tous ». Scrollable horizontalement au cas où
+// un festival aurait beaucoup de jours.
+class _TrendingDayFilter extends StatelessWidget {
+  final List<String> days; // clés anglaises ('friday'…), triées par day_int
+  final String? selectedDay; // null = Tous
+  final void Function(String?) onChanged;
+
+  const _TrendingDayFilter({
+    required this.days,
+    required this.selectedDay,
+    required this.onChanged,
+  });
+
+  /// Libellé court d'une clé jour ('friday' → 'Ven.').
+  static String _shortName(String day) {
+    switch (day.toLowerCase()) {
+      case 'monday':
+        return 'Lun.';
+      case 'tuesday':
+        return 'Mar.';
+      case 'wednesday':
+        return 'Mer.';
+      case 'thursday':
+        return 'Jeu.';
+      case 'friday':
+        return 'Ven.';
+      case 'saturday':
+        return 'Sam.';
+      case 'sunday':
+        return 'Dim.';
+      default:
+        return day;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Options : « Tous » (clé null, représentée par '') puis chaque jour.
+    final options = <String?>[null, ...days];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ToggleButtons(
+        isSelected: options.map((d) => d == selectedDay).toList(),
+        onPressed: (i) => onChanged(options[i]),
+        constraints: const BoxConstraints(minHeight: 32, minWidth: 50),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.white54,
+        selectedColor: Colors.white,
+        fillColor: AppTheme.accent,
+        borderColor: Colors.white24,
+        selectedBorderColor: AppTheme.accent,
+        children: options
+            .map((d) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    d == null ? 'Tous' : _shortName(d),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ))
+            .toList(),
       ),
     );
   }

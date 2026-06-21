@@ -40,7 +40,8 @@ class MainBottomNavBar extends StatelessWidget {
             icon: Icon(Icons.schedule), label: 'Timetable'),
         const BottomNavigationBarItem(
             icon: Icon(Icons.trending_up), label: 'Tendances'),
-        const BottomNavigationBarItem(icon: Icon(Icons.tag), label: 'Tags'),
+        const BottomNavigationBarItem(
+            icon: Icon(Icons.search), label: 'Search'),
       ],
     );
   }
