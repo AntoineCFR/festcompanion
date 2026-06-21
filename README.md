@@ -266,6 +266,13 @@ Ideas not yet implemented:
 
 ## Release notes
 
+### 1.6.1 — 2026-06-21
+- **Search tag filter polish.** The tag filter sheet now shows each tag's DJ
+  count (`#techno (12)`) and is sorted alphabetically. In the results, each DJ
+  tile's tag row is capped to a **single line** — the number of tags shown adapts
+  to their actual width (a long `#melodictechno` takes the room of several short
+  ones) — so all tiles share the same height.
+
 ### 1.6.0 — 2026-06-21
 - **Search tab (merged with Tags).** The bottom-nav *Tags* tab is now **Search**:
   a search bar (matches DJ name first, also stage, day and tag) plus a row of

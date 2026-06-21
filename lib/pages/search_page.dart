@@ -66,17 +66,8 @@ class _SearchViewState extends State<SearchView> {
       _selectedStages.isNotEmpty ||
       _selectedTags.isNotEmpty;
 
-  /// Tags triés par popularité (nb de DJ concernés) décroissante, puis alpha.
-  List<String> _orderedTags() {
-    final tags = AppDataManager().allTagLabels;
-    final counts = {
-      for (final t in tags) t: AppDataManager().setIdsForTag(t).length
-    };
-    return [...tags]..sort((a, b) {
-        final byCount = counts[b]!.compareTo(counts[a]!);
-        return byCount != 0 ? byCount : a.compareTo(b);
-      });
-  }
+  /// Libellé d'un tag dans la feuille de filtre : `#tag (nb de DJ)`.
+  String _tagLabel(String t) => '#$t (${AppDataManager().setIdsForTag(t).length})';
 
   Future<void> _onDjTileTap(TimetableItem item) async {
     await Navigator.push(
@@ -264,9 +255,9 @@ class _SearchViewState extends State<SearchView> {
                 count: _selectedTags.length,
                 onTap: () => _openFilterSheet(
                   title: 'Filtrer par tag',
-                  options: _orderedTags(),
+                  options: allTags, // allTagLabels = déjà trié alphabétiquement
                   selected: _selectedTags,
-                  labelOf: (t) => '#$t',
+                  labelOf: _tagLabel,
                 ),
               ),
             if (_hasActiveFilters)
@@ -492,27 +483,68 @@ class _TagsLine extends StatelessWidget {
     required this.onTagTap,
   });
 
-  /// Nombre de puces avant le « +N autres » (au-delà, on tronque pour rester
-  /// sur une ligne).
-  static const int _maxShown = 3;
+  /// Style (gras, conservateur) servant à MESURER la largeur des puces pour
+  /// décider combien tiennent sur une seule ligne.
+  static const TextStyle _measureStyle =
+      TextStyle(fontSize: 11, fontWeight: FontWeight.w600);
+
+  /// Largeur estimée d'une puce pour un libellé (texte + padding + sécurité).
+  double _pillWidth(String text, TextScaler scaler) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: _measureStyle),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    return tp.width + 18; // padding horizontal (8+8) + marge bordure/arrondi
+  }
 
   @override
   Widget build(BuildContext context) {
     if (tags.isEmpty) return const SizedBox.shrink();
-    final shown = tags.take(_maxShown).toList();
-    final extra = tags.length - shown.length;
+    const spacing = 6.0;
+    final scaler = MediaQuery.textScalerOf(context);
 
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 4,
-        children: [
-          for (final t in shown)
-            _pill('#$t', onTap: () => onTagTap(t), active: activeTags.contains(t)),
-          if (extra > 0)
-            _pill('+$extra autres', onTap: () => _showAllSetTags(context)),
-        ],
+      // Une SEULE ligne : on calcule combien de puces tiennent dans la largeur
+      // dispo (selon la longueur RÉELLE des libellés), le reste bascule en
+      // « +N autres ». Toutes les tuiles ont ainsi la même hauteur.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxW = constraints.maxWidth;
+          final shown = <String>[];
+          double used = 0;
+          for (var i = 0; i < tags.length; i++) {
+            final w = _pillWidth('#${tags[i]}', scaler);
+            final addition = (shown.isEmpty ? 0 : spacing) + w;
+            final remainingAfter = tags.length - (i + 1);
+            // Réserve la place d'un « +N autres » s'il restera des tags après.
+            final reserve = remainingAfter > 0
+                ? spacing + _pillWidth('+$remainingAfter autres', scaler)
+                : 0.0;
+            if (used + addition + reserve <= maxW) {
+              shown.add(tags[i]);
+              used += addition;
+            } else {
+              break;
+            }
+          }
+          final extra = tags.length - shown.length;
+
+          final children = <Widget>[];
+          for (final t in shown) {
+            if (children.isNotEmpty) children.add(const SizedBox(width: spacing));
+            children.add(_pill('#$t',
+                onTap: () => onTagTap(t), active: activeTags.contains(t)));
+          }
+          if (extra > 0) {
+            if (children.isNotEmpty) children.add(const SizedBox(width: spacing));
+            children.add(
+                _pill('+$extra autres', onTap: () => _showAllSetTags(context)));
+          }
+          return Row(mainAxisSize: MainAxisSize.min, children: children);
+        },
       ),
     );
   }
