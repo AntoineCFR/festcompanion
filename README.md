@@ -266,6 +266,13 @@ Ideas not yet implemented:
 
 ## Release notes
 
+### 1.6.2 — 2026-06-21
+- **Contextual filter counts in Search.** Each Day / Stage / Tag option now shows
+  a count in parentheses = the number of distinct DJs that match given the *other*
+  active filters and the text query (the facet itself is excluded, so options
+  don't collapse to 0). Counts are by distinct set, so the same tag added by two
+  users on one DJ counts once.
+
 ### 1.6.1 — 2026-06-21
 - **Search tag filter polish.** The tag filter sheet now shows each tag's DJ
   count (`#techno (12)`) and is sorted alphabetically. In the results, each DJ

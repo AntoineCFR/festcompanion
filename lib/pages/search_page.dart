@@ -66,8 +66,53 @@ class _SearchViewState extends State<SearchView> {
       _selectedStages.isNotEmpty ||
       _selectedTags.isNotEmpty;
 
-  /// Libellé d'un tag dans la feuille de filtre : `#tag (nb de DJ)`.
-  String _tagLabel(String t) => '#$t (${AppDataManager().setIdsForTag(t).length})';
+  /// Tags d'un set (distincts) indexés par setId.
+  Map<int, Set<String>> _tagsBySet() {
+    final m = <int, Set<String>>{};
+    for (final dt in AppDataManager().djTags) {
+      m.putIfAbsent(dt.setId, () => <String>{}).add(dt.tag);
+    }
+    return m;
+  }
+
+  /// Compteurs CONTEXTUELS d'une facette ('day' | 'stage' | 'tag') : pour chaque
+  /// option, le nombre de DJ (sets DISTINCTS) qui matcheraient compte tenu des
+  /// AUTRES filtres + la recherche texte. On n'applique pas la facette elle-même
+  /// (sinon les options non cochées tomberaient à 0). Distinct par setId → un tag
+  /// posé par plusieurs users sur le même set ne compte qu'une fois.
+  Map<String, int> _facetCounts(String facet, Map<int, Set<String>> tagsBySet) {
+    final byOption = <String, Set<int>>{};
+    for (final t in AppDataManager().timetable) {
+      final tg = tagsBySet[t.setId] ?? const <String>{};
+      if (facet != 'day' &&
+          _selectedDays.isNotEmpty &&
+          !_selectedDays.contains(t.day)) {
+        continue;
+      }
+      if (facet != 'stage' &&
+          _selectedStages.isNotEmpty &&
+          !_selectedStages.contains(t.stage)) {
+        continue;
+      }
+      if (facet != 'tag' &&
+          _selectedTags.isNotEmpty &&
+          _selectedTags.intersection(tg).isEmpty) {
+        continue;
+      }
+      if (!_matchesQuery(t, tg)) continue;
+
+      if (facet == 'day') {
+        byOption.putIfAbsent(t.day, () => <int>{}).add(t.setId);
+      } else if (facet == 'stage') {
+        byOption.putIfAbsent(t.stage, () => <int>{}).add(t.setId);
+      } else {
+        for (final tag in tg) {
+          byOption.putIfAbsent(tag, () => <int>{}).add(t.setId);
+        }
+      }
+    }
+    return {for (final e in byOption.entries) e.key: e.value.length};
+  }
 
   Future<void> _onDjTileTap(TimetableItem item) async {
     await Navigator.push(
@@ -134,10 +179,7 @@ class _SearchViewState extends State<SearchView> {
     final timetable = AppDataManager().timetable;
 
     // Tags DISTINCTS par set (pour le filtre tags ET la ligne de tags des tuiles).
-    final tagsBySet = <int, Set<String>>{};
-    for (final dt in AppDataManager().djTags) {
-      tagsBySet.putIfAbsent(dt.setId, () => <String>{}).add(dt.tag);
-    }
+    final tagsBySet = _tagsBySet();
 
     // Jours distincts, ordonnés par dayInt.
     final dayOrder = <String, int>{};
@@ -232,6 +274,7 @@ class _SearchViewState extends State<SearchView> {
               icon: Icons.calendar_today,
               count: _selectedDays.length,
               onTap: () => _openFilterSheet(
+                facet: 'day',
                 title: 'Filtrer par jour',
                 options: days,
                 selected: _selectedDays,
@@ -243,6 +286,7 @@ class _SearchViewState extends State<SearchView> {
               icon: Icons.location_city,
               count: _selectedStages.length,
               onTap: () => _openFilterSheet(
+                facet: 'stage',
                 title: 'Filtrer par scène',
                 options: stages,
                 selected: _selectedStages,
@@ -254,10 +298,11 @@ class _SearchViewState extends State<SearchView> {
                 icon: Icons.tag,
                 count: _selectedTags.length,
                 onTap: () => _openFilterSheet(
+                  facet: 'tag',
                   title: 'Filtrer par tag',
                   options: allTags, // allTagLabels = déjà trié alphabétiquement
                   selected: _selectedTags,
-                  labelOf: _tagLabel,
+                  labelOf: (t) => '#$t',
                 ),
               ),
             if (_hasActiveFilters)
@@ -324,11 +369,15 @@ class _SearchViewState extends State<SearchView> {
   /// Feuille de sélection multiple pour une catégorie de filtre. Applique les
   /// changements en direct (la liste derrière se met à jour à chaque toggle).
   Future<void> _openFilterSheet({
+    required String facet,
     required String title,
     required List<String> options,
     required Set<String> selected,
     String Function(String)? labelOf,
   }) async {
+    // Compteurs contextuels figés à l'ouverture (les autres facettes/la requête
+    // ne changent pas tant que la feuille est ouverte).
+    final counts = _facetCounts(facet, _tagsBySet());
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -382,7 +431,8 @@ class _SearchViewState extends State<SearchView> {
                               for (final opt in options)
                                 FilterChip(
                                   label: Text(
-                                      labelOf != null ? labelOf(opt) : opt),
+                                      '${labelOf != null ? labelOf(opt) : opt}'
+                                      ' (${counts[opt] ?? 0})'),
                                   selected: selected.contains(opt),
                                   onSelected: (on) {
                                     setSheetState(() {
