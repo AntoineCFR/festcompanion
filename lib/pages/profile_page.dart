@@ -131,10 +131,9 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Place-toi à ta tente puis enregistre. Surtout utile pour TE guider '
-          'jusqu\'à ton lit au retour de la dernière scène, quand ton sens de '
-          'l\'orientation aura, disons, pris sa soirée. Accessoirement, tes amis '
-          'pourront aussi te rejoindre.',
+          'Place-toi à ta tente puis enregistre. Comme ça t\'es sûr de rentrer '
+          'ce soir. Et puis accessoirement tes potes pourront aussi te rejoindre '
+          'pour l\'apéro demain.',
           style: TextStyle(color: Colors.white38, fontSize: 11.5),
         ),
       ],

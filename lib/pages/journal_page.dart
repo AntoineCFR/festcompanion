@@ -5,21 +5,57 @@ import '../services/app_data_manager.dart';
 import '../utils/utils.dart';
 import '../widgets/shared/festival_background.dart';
 
-/// Page « Journal » (accessible depuis le drawer) : la timeline de toutes les
-/// notifications programmées du festival (push quotidiennes, vannes horaires,
-/// clôture, palmarès). Le serveur est la source de vérité → le journal est
-/// identique pour tout le groupe, même si une push a été manquée.
+/// Thème des changements de line-up (ajout / horaire / annulation / rétabli).
+const String kProgrammationTheme = 'programmation';
+
+/// Libellés lisibles par thème (pour les puces de filtre). Fallback : le thème
+/// brut capitalisé.
+const Map<String, String> _kThemeLabels = {
+  'programmation': 'Programmation',
+  'trending': 'Tendances',
+  'palmares': 'Palmarès',
+  'closing': 'Clôture',
+  'countdown': 'Décompte',
+  'hype': 'Hype',
+  'sos': 'SOS',
+  'lost': 'Perdu',
+  'bar': 'Bar',
+  'hydration': 'Hydratation',
+  'energy': 'Énergie',
+  'tent': 'Tente',
+  'location': 'Localisation',
+  'jure': 'Jury',
+  'fomo': 'FOMO',
+};
+
+String _themeLabel(String theme) {
+  final known = _kThemeLabels[theme];
+  if (known != null) return known;
+  return theme.isEmpty ? 'Autre' : theme[0].toUpperCase() + theme.substring(1);
+}
+
+/// Page « Journal » (accessible depuis le drawer) : la timeline de TOUTES les
+/// notifications du festival (push quotidiennes, vannes, décompte, clôture,
+/// changements de programmation…), avec un filtre par thème. Le serveur est la
+/// source de vérité → le journal est identique pour tout le groupe.
 class JournalPage extends StatefulWidget {
-  const JournalPage({super.key});
+  /// Thème pré-sélectionné à l'ouverture (ex. un push de programmation ouvre le
+  /// journal filtré sur « Programmation »). null = « Tout ».
+  final String? initialTheme;
+  const JournalPage({super.key, this.initialTheme});
 
   @override
   State<JournalPage> createState() => _JournalPageState();
 }
 
 class _JournalPageState extends State<JournalPage> {
+  // null = aucun filtre (toutes les notifs).
+  String? _selectedTheme;
+
   @override
   void initState() {
     super.initState();
+    _selectedTheme = widget.initialTheme;
     // Stale-while-revalidate : affiche le cache puis rafraîchit (bandeau non
     // bloquant via FestivalBackground). force:true → on retente même si déjà
     // chargé une fois dans la session (le journal s'enrichit en cours de journée).
@@ -43,13 +79,41 @@ class _JournalPageState extends State<JournalPage> {
         child: ValueListenableBuilder<int>(
           valueListenable: AppDataManager().dataRevision,
           builder: (context, _, _) {
-            final entries = AppDataManager().journal;
-            if (entries.isEmpty) {
-              return _EmptyState(onRefresh: _refresh);
-            }
-            return RefreshIndicator(
-              onRefresh: _refresh,
-              child: _buildList(entries),
+            final all = AppDataManager().journal;
+
+            // Thèmes proposés au filtre = ceux présents dans les données (+ le
+            // thème pré-sélectionné, même absent, pour rester cohérent).
+            final themes = <String>{
+              for (final e in all)
+                if (e.theme != null && e.theme!.isNotEmpty) e.theme!,
+              ?_selectedTheme,
+            }.toList()
+              ..sort((a, b) => _themeLabel(a).compareTo(_themeLabel(b)));
+
+            final entries = _selectedTheme == null
+                ? all
+                : all.where((e) => e.theme == _selectedTheme).toList();
+
+            return Column(
+              children: [
+                if (themes.isNotEmpty)
+                  _ThemeFilterBar(
+                    themes: themes,
+                    selected: _selectedTheme,
+                    onSelected: (t) => setState(() => _selectedTheme = t),
+                  ),
+                Expanded(
+                  child: entries.isEmpty
+                      ? _EmptyState(
+                          onRefresh: _refresh,
+                          filtered: _selectedTheme != null,
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _refresh,
+                          child: _buildList(entries),
+                        ),
+                ),
+              ],
             );
           },
         ),
@@ -60,16 +124,7 @@ class _JournalPageState extends State<JournalPage> {
   Widget _buildList(List<JournalEntry> entries) {
     // Entrées déjà triées du serveur (récentes d'abord). On insère un en-tête de
     // date à chaque changement de jour (date locale de création).
-    final items = <Widget>[
-      const Padding(
-        padding: EdgeInsets.fromLTRB(20, 14, 20, 4),
-        child: Text(
-          'Toutes les notifs du festival, les plus récentes en premier.',
-          style: TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-      ),
-    ];
-
+    final items = <Widget>[];
     String? lastDateLabel;
     for (final e in entries) {
       final dateLabel = AppUtils.formatFullDate(e.createdAt);
@@ -81,8 +136,58 @@ class _JournalPageState extends State<JournalPage> {
     }
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.only(top: 4, bottom: 24),
       children: items,
+    );
+  }
+}
+
+/// Rangée horizontale de puces de filtre : « Tout » + un thème par puce.
+class _ThemeFilterBar extends StatelessWidget {
+  final List<String> themes;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  const _ThemeFilterBar({
+    required this.themes,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        children: [
+          _chip(label: 'Tout', value: null),
+          for (final t in themes) _chip(label: _themeLabel(t), value: t),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip({required String label, required String? value}) {
+    final isSelected = selected == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        showCheckmark: false,
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : Colors.white70,
+          fontSize: 13,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        backgroundColor: AppTheme.surface.withValues(alpha: 0.6),
+        selectedColor: AppTheme.accent.withValues(alpha: 0.85),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+        // Re-sélectionner « Tout » (value null) revient à tout afficher.
+        onSelected: (_) => onSelected(value),
+      ),
     );
   }
 }
@@ -142,6 +247,8 @@ class _JournalTile extends StatelessWidget {
         return Icons.celebration;
       case 'palmares':
         return Icons.emoji_events;
+      case kProgrammationTheme:
+        return Icons.edit_calendar;
       default:
         return Icons.notifications;
     }
@@ -150,7 +257,7 @@ class _JournalTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Heure affichée : l'heure prévue si dispo (créneaux), sinon l'heure de
-    // création (clôture/palmarès).
+    // création (clôture/palmarès/programmation).
     final timeLabel = entry.scheduledLocal ?? AppUtils.formatTime(entry.createdAt);
 
     return Padding(
@@ -230,7 +337,8 @@ class _JournalTile extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final Future<void> Function() onRefresh;
-  const _EmptyState({required this.onRefresh});
+  final bool filtered;
+  const _EmptyState({required this.onRefresh, this.filtered = false});
 
   @override
   Widget build(BuildContext context) {
@@ -239,14 +347,19 @@ class _EmptyState extends StatelessWidget {
       onRefresh: onRefresh,
       child: ListView(
         children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.22),
-          Icon(Icons.auto_stories_outlined,
-              size: 56, color: Colors.white.withValues(alpha: 0.25)),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.18),
+          Icon(
+            filtered ? Icons.filter_alt_off_outlined : Icons.auto_stories_outlined,
+            size: 56,
+            color: Colors.white.withValues(alpha: 0.25),
+          ),
           const SizedBox(height: 16),
-          const Center(
+          Center(
             child: Text(
-              'Le journal est vide pour l\'instant',
-              style: TextStyle(
+              filtered
+                  ? 'Aucune notif pour ce filtre'
+                  : 'Le journal est vide pour l\'instant',
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -254,12 +367,14 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Les notifications du festival apparaîtront ici au fil des jours.',
+              filtered
+                  ? 'Choisis « Tout » pour revoir l\'ensemble des notifications.'
+                  : 'Les notifications du festival apparaîtront ici au fil des jours.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white60, fontSize: 13),
+              style: const TextStyle(color: Colors.white60, fontSize: 13),
             ),
           ),
         ],

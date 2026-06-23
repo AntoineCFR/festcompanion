@@ -266,6 +266,26 @@ Ideas not yet implemented:
 
 ## Release notes
 
+### 1.7.0 — 2026-06-23
+- **Line-up changes in the Journal.** The Journal is now a single unified
+  timeline with a **theme filter** (a chip row: *All* + one chip per theme).
+  Line-up changes — added sets, time changes, cancellations, reinstated sets —
+  appear under the **Programmation** theme alongside the other notifications, and
+  can be isolated with one tap on the filter. These entries are generated
+  server-side when the scraper re-syncs the line-up: thanks to a new diff-based
+  sync, a set keeps its `set_id` when only its time changes (favorites, ratings
+  and tags stay attached), a removed set is deactivated rather than erased, and
+  every visible change is logged to the journal under the `programmation` theme.
+- **Line-up change push.** Each line-up change is pushed to everyone (one
+  notification per change); tapping it opens the Journal **pre-filtered to
+  Programmation**. Receiving such a push also force-refreshes the cached
+  timetable, so the Line-up screen shows the new time right away (instead of
+  waiting for the next 12/18/22h revalidation slot).
+- **Tent helper copy.** Reworded the tent-location hint on the profile screen.
+- **About page.** New drawer entry showing the **installed app version** and build
+  number (read from the platform via `package_info_plus`) — handy to check users
+  are on the right build.
+
 ### 1.6.2 — 2026-06-21
 - **Contextual filter counts in Search.** Each Day / Stage / Tag option now shows
   a count in parentheses = the number of distinct DJs that match given the *other*

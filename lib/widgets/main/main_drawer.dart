@@ -7,6 +7,7 @@ import '../../pages/stages_page.dart';
 import '../../pages/journal_page.dart';
 import '../../pages/festival_selection_page.dart';
 import '../../pages/theme_page.dart';
+import '../../pages/about_page.dart';
 import '../../services/app_data_manager.dart';
 
 class MainDrawer extends StatelessWidget {
@@ -126,6 +127,10 @@ class MainDrawer extends StatelessWidget {
               icon: Icons.palette,
               label: 'Thème',
               onTap: () => _push(context, const ThemePage())),
+          _tile(context,
+              icon: Icons.info_outline,
+              label: 'À propos',
+              onTap: () => _push(context, const AboutPage())),
 
           const Divider(color: Colors.white24),
 

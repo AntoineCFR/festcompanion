@@ -465,6 +465,20 @@ class AppDataManager {
     }
   }
 
+  /// Force le rechargement de la timetable PUIS notifie les écrans. Appelé à la
+  /// réception d'un push « changement de programmation » pour que le line-up
+  /// reflète immédiatement le nouvel horaire, sans attendre un créneau
+  /// 12/18/22h ni un pull-to-refresh. Best-effort (le cache reste valable en cas
+  /// d'échec réseau).
+  Future<void> refreshTimetableForced() async {
+    try {
+      await loadTimetable(force: true);
+      dataRevision.value++;
+    } catch (_) {
+      // best-effort : le cache déjà affiché reste valable
+    }
+  }
+
   // Charge les utilisateurs (stale-while-revalidate). Affiche le cache local
   // IMMÉDIATEMENT (équipe + URLs de photos), puis rafraîchit depuis le serveur
   // en arrière-plan (positions à jour) → pastille « mise à jour de l'équipe ».

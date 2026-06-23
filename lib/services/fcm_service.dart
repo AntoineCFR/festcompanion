@@ -92,19 +92,25 @@ class FcmService {
     final eventType = message.data['event_type'];
     if (eventType == 'perdu') {
       AppDataManager().loadUsers().ignore();
+    } else if (eventType == 'programmation') {
+      // Changement de line-up → recharge la timetable (le line-up doit refléter
+      // le nouvel horaire) PUIS ouvre le Journal filtré sur « Programmation ».
+      AppDataManager().refreshTimetableForced().ignore();
+      _openJournal(theme: kProgrammationTheme);
     } else if (eventType == 'journal') {
       // Notif programmée (push quotidienne, vanne, décompte, clôture) → Journal.
       _openJournal();
     }
   }
 
-  /// Ouvre la page Journal via le navigateur global. Différé d'une frame :
-  /// au lancement depuis l'état terminé (getInitialMessage), le navigateur peut
-  /// ne pas être encore monté à l'instant du tap.
-  static void _openJournal() {
+  /// Ouvre la page Journal via le navigateur global, optionnellement pré-filtré
+  /// sur [theme] (null = toutes les notifs). Différé d'une frame : au lancement
+  /// depuis l'état terminé (getInitialMessage), le navigateur peut ne pas être
+  /// encore monté à l'instant du tap.
+  static void _openJournal({String? theme}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const JournalPage()),
+        MaterialPageRoute(builder: (_) => JournalPage(initialTheme: theme)),
       );
     });
   }
@@ -124,6 +130,9 @@ class FcmService {
       // porte l'event_type → on route vers le Journal pour les notifs programmées.
       onDidReceiveNotificationResponse: (response) {
         if (response.payload == 'journal') _openJournal();
+        if (response.payload == 'programmation') {
+          _openJournal(theme: kProgrammationTheme);
+        }
       },
     );
   }
@@ -140,6 +149,12 @@ class FcmService {
     // pour afficher les positions à jour.
     if (eventType == 'perdu') {
       AppDataManager().loadUsers().ignore();
+    }
+
+    // Changement de programmation : recharge la timetable pour que le line-up
+    // affiche tout de suite le nouvel horaire, même si l'app est déjà ouverte.
+    if (eventType == 'programmation') {
+      AppDataManager().refreshTimetableForced().ignore();
     }
 
     // ── Affichage notification locale ─────────────────────────────────────────
