@@ -10,7 +10,9 @@ class WeatherService {
 
   /// Fenêtre de prévision de WeatherAPI : les prévisions ne sont disponibles
   /// que dans les [forecastWindowDays] jours qui précèdent une date.
-  static const int forecastWindowDays = 14;
+  /// WeatherAPI compte aujourd'hui comme jour 1 → jour 14 = aujourd'hui + 13 j.
+  /// Pour que le 1er jour du festival soit couvert, on soustrait 13 jours.
+  static const int forecastWindowDays = 13;
 
   /// Heures (locales) auxquelles le CRON serveur rafraîchit la météo. Entre deux
   /// créneaux, les données du serveur ne changent pas → inutile de re-requêter.
@@ -21,7 +23,7 @@ class WeatherService {
   String get _cacheKey => 'cached_weather_${ApiService.currentFestivalId ?? 0}';
   String get _cacheTsKey => 'cached_weather_ts_${ApiService.currentFestivalId ?? 0}';
 
-  /// Date d'ouverture des prévisions pour un festival (= début − 14 jours).
+  /// Date d'ouverture des prévisions pour un festival (= début − [forecastWindowDays] jours).
   static DateTime availabilityDate(Festival f) =>
       DateTime(f.startDate.year, f.startDate.month, f.startDate.day)
           .subtract(const Duration(days: forecastWindowDays));

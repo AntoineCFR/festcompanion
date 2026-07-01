@@ -73,7 +73,7 @@ This repository contains the **Flutter client**. The companion REST API lives in
 
 ### ⭐ Shared favorites & ratings
 - One tap to favorite a set; favorites sync across the group.
-- **5-point rating** per set, with aggregated views of who-liked-what.
+- **10-point rating** per set, with aggregated views of who-liked-what.
 - Fully **offline-tolerant**: optimistic local updates with background sync to the server.
 
 ### 🏷️ Collaborative DJ tags
@@ -96,10 +96,26 @@ Three one-tap event types broadcast to everyone via Firebase Cloud Messaging:
 - **Lost** — "I'm lost", which also refreshes everyone's stage so the group can converge on a rally point.
 - **Hype** — "it's going off over here, come through!"
 
-### 🌦️ At-a-glance home
-- Live **weather forecast** for the festival days (pulled from WeatherAPI, cached server-side).
+### 🔴 Live & at-a-glance home
+- A **"Live"** landing (auto-selected during the event) showing **what's playing now** and **what's next** on each stage, with live progress bars.
+- Live **weather forecast** for the festival days (pulled from WeatherAPI, cached server-side, only fetched once the forecast window opens).
 - **Countdown timer** to the first set (derived from the festival's own timetable).
 - Quick access to your current location / stage.
+
+### 📨 Journal & scheduled notifications
+- A server-driven **Journal** (a single timeline with a per-theme filter) records every notification the festival sends.
+- **Scheduled "fun" pushes** built server-side from the group's own data: a daily Trending spotlight, plus playful daily awards (biggest drinker, most "lost", top hydrator, FOMO champion…), all gender-aware.
+- **Countdown pushes** (J-30 → J-1) that ramp up as the event approaches — testable live well before the weekend.
+- **Line-up change pushes**: when the line-up re-syncs, added/cancelled/rescheduled sets are pushed and logged under a *Programmation* filter; tapping one opens the Journal and force-refreshes the cached timetable.
+- **Onboarding nudges**: a tent-location reminder before the first set and a graduated location-sharing sequence on day 0.
+
+### ⏰ Local reminders (offline, no server)
+- A **set reminder** ~10 min before each of your favorited sets — tapping it jumps to the Live tab.
+- A **hydration reminder** every 2 h through each festival day, with day-themed copy (escalating from serious to silly) — tapping it jumps to Events to log a drink.
+- Scheduled at the festival's **wall-clock time** via its IANA timezone, so they fire correctly whatever timezone the phone is in; rescheduled whenever favorites change.
+
+### 🏕️ Tent / camp location
+- Save your **tent location** per festival (Mon compte) and navigate back to it — the 4 a.m. you, compass broken, will be grateful.
 
 ### 👤 Profiles & team
 - Per-user profile photos (Firebase Storage), phone number, and location sharing toggle.
@@ -124,7 +140,7 @@ Three one-tap event types broadcast to everyone via Firebase Cloud Messaging:
 │  │  • ApiService (HTTP)   │   │                       ▼
 │  │  • LocalStorage (cache)│   │            ┌──────────────────────────┐
 │  │  • FcmService (push)   │   │            │   Google BigQuery          │
-│  │  • GeolocBackground    │   │            │ festivals · festival_users │
+│  │  • NotificationSched.  │   │            │ festivals · festival_users │
 │  └────────────────────────┘   │            │ timetable · users ·        │
 │                               │            │ favorites · stages ·       │
 └──────────────┬────────────────┘            │ geoloc · events · weather  │
@@ -155,9 +171,9 @@ Three one-tap event types broadcast to everyone via Firebase Cloud Messaging:
 | **State** | Singleton `AppDataManager` + service layer (no heavyweight state lib — deliberately lean) |
 | **Networking** | `http`, JSON serialization via model `fromJson`/`toJson` |
 | **Local cache** | `shared_preferences` (per-festival namespacing) |
-| **Push** | `firebase_messaging` + `flutter_local_notifications` (foreground display) |
+| **Push** | `firebase_messaging` (remote) + `flutter_local_notifications` + `timezone` (scheduled local reminders) |
 | **Auth & media** | `firebase_auth`, `firebase_storage`, `image_picker`, `cached_network_image` |
-| **Location** | `geolocator`, `location` (foreground fixes only) |
+| **Location** | `geolocator` (foreground fixes only) |
 | **Config** | `flutter_dotenv` |
 | **Backend** | Python · Flask · Flask-CORS · Gunicorn |
 | **Data** | Google BigQuery (`google-cloud-bigquery`, pandas) |
@@ -176,7 +192,8 @@ lib/
 │   ├── app_data_manager.dart #   ⭐ central singleton state store (+ selected festival)
 │   ├── api_service.dart      #   REST client (injects festival_id)
 │   ├── local_storage_service.dart
-│   ├── fcm_service.dart      #   push notification wiring
+│   ├── fcm_service.dart      #   remote push (FCM) wiring & deep-link routing
+│   ├── notification_scheduler.dart #  local set/hydration reminders (timezone-aware)
 │   ├── auth_service.dart · profile_service.dart · weather_service.dart
 ├── pages/                    # Screens (festival selection, home, lineup, timetable, stages, events, profile, team, login…)
 ├── widgets/                  # Reusable UI, grouped by feature (home/ lineup/ timetable/ ratings/ team/ stages/…)
@@ -202,7 +219,7 @@ A few problems worth calling out — these are the kinds of things that came up 
 
 - **Foreground-only geolocation (a deliberate scope cut).** An earlier design tracked location in the background via a WorkManager isolate, which forced `LocationPermission.always`, drained battery, and was unreliable for small/overlapping stage zones. It was dropped in favour of refreshing a member's position only when the app is **open** — or when they tap a "lost" alert (the push handler fires a one-shot fix). Simpler permissions ("while in use"), no battery cost, and good enough for a group converging on a rally point.
 
-- **Bayesian ranking on tiny samples.** With ~15 users and only a handful of ratings per set, a plain average lets a single 5★ top the chart. The "Trending" screen uses a Bayesian average — `(C·m + Σ) / (C + n)` with a tuned confidence constant `C` — to pull thinly-rated sets toward the global mean. It runs client-side over already-cached ratings, so it costs no extra round-trip.
+- **Bayesian ranking on tiny samples.** With ~15 users and only a handful of ratings per set, a plain average lets a single 10/10 top the chart. The "Trending" screen uses a Bayesian average — `(C·m + Σ) / (C + n)` with a tuned confidence constant `C` — to pull thinly-rated sets toward the global mean. It runs client-side over already-cached ratings, so it costs no extra round-trip.
 
 - **Offline-first, optimistic UI.** Favorites/ratings update local state immediately and cache to disk (cache keys namespaced per festival to avoid cross-event bleed), then sync to the server; on a flaky festival network the UI never blocks, and the app falls back to a cached timetable/stages when the API is unreachable.
 
@@ -221,12 +238,16 @@ The Flask service exposes a small, focused REST surface. Every data endpoint is 
 | `GET` | `/api/festivals` · `/api/festivals/<id>` | List festivals / one festival's metadata |
 | `GET` | `/timetable?festival_id=` | Full line-up (times adjusted to the festival TZ) |
 | `GET` | `/users?festival_id=` · `/users/check` | Users on a festival / resolve username → id |
+| `POST` | `/users/<id>/phone` · `/location` · `/tent` | Update phone (global), current location, or tent/camp location |
 | `GET` `POST` | `/api/user-favorites` `/toggle` `/rate` | Read / toggle / rate favorites (UPSERT) |
 | `GET` `POST` `DELETE` | `/api/dj-tags` | Read / add / remove collaborative DJ tags (keyed by set) |
 | `GET` `PUT` | `/api/stages` `/api/stages/<name>` | Read / update stage geo-boxes |
 | `POST` | `/api/geoloc` | Push a user's GPS → resolve & store stage |
 | `GET` `POST` `DELETE` | `/api/events` `/api/events/last` | Read / create / undo SOS·lost·hype events |
 | `GET` `POST` | `/weather` `/update-weather` | Read cached forecast / refresh from WeatherAPI |
+| `GET` | `/api/journal?festival_id=` | The festival's notification journal (feeds the Journal screen) |
+| `GET` | `/api/push/tick` | Cron tick: sends scheduled/countdown pushes due now, idempotent |
+| `GET` `POST` | `/api/admin/refresh-lineup` | Re-scrape & diff-sync the line-up (stable `set_id`); secret-protected |
 
 ---
 
@@ -265,6 +286,13 @@ Ideas not yet implemented:
 ---
 
 ## Release notes
+
+### 1.7.1 — 2026-06-27
+- **Weather availability window.** The home weather section now opens exactly when
+  the backend can first return a festival day. WeatherAPI counts today as day 1, so
+  a 14-day window reaches *today + 13 days*; the availability date is computed as
+  `start − 13 days` (was 14), removing a one-day gap where the app announced
+  "weather available" but the server had nothing in range yet.
 
 ### 1.7.0 — 2026-06-23
 - **Line-up changes in the Journal.** The Journal is now a single unified

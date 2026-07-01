@@ -2,7 +2,7 @@ name: festcompanion  # Nom de ton appli (sans espaces, en snake_case)
 description: All you need in one place for your summer festivals!
 
 # Version de l'appli (format : major.minor.patch)
-version: 1.7.0+27
+version: 1.7.1+28
 
 environment:
   sdk: '^3.11.0'  # Version du SDK Dart compatible
