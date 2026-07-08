@@ -32,7 +32,7 @@ class TimetableStageView extends StatelessWidget {
     return Column(
       children: groupedItems.entries.map((entry) {
         return TimetableStageRow(
-          stage: entry.key,
+          stage: TimetableItem.stageLabel(entry.key, entry.value.first.host),
           items: entry.value,
           totalWidth: totalWidth,
           minStartTime: minStartTime,

@@ -945,20 +945,23 @@ class AppDataManager {
 
   // Charge les scènes (stale-while-revalidate). Affiche le cache local
   // IMMÉDIATEMENT puis rafraîchit depuis le serveur en arrière-plan (pastille).
-  Future<void> loadStages() async {
-    if (_stages.isNotEmpty) return;
+  // force=true : bypass le cache et refetch bloquant (après une mutation admin).
+  Future<void> loadStages({bool force = false}) async {
+    if (!force && _stages.isNotEmpty) return;
     final fid = selectedFestivalId;
     if (fid == null) throw Exception('Aucun festival sélectionné.');
 
-    // Cache local d'abord → affichage instantané, refresh réseau en fond.
-    final cached = await LocalStorageService().getStages(fid);
-    if (cached.isNotEmpty) {
-      _stages = cached;
-      _refreshStagesInBackground(fid);
-      return;
+    if (!force) {
+      // Cache local d'abord → affichage instantané, refresh réseau en fond.
+      final cached = await LocalStorageService().getStages(fid);
+      if (cached.isNotEmpty) {
+        _stages = cached;
+        _refreshStagesInBackground(fid);
+        return;
+      }
     }
 
-    // Aucun cache (1er accès) → fetch bloquant.
+    // Aucun cache (1er accès) ou refresh forcé → fetch bloquant.
     _isLoadingStages = true;
     _beginLoad(LoadDomain.stages);
     try {
@@ -971,6 +974,18 @@ class AppDataManager {
     } finally {
       _isLoadingStages = false;
       _endLoad(LoadDomain.stages);
+    }
+  }
+
+  /// Force le rechargement des scènes PUIS notifie les écrans. Appelé après une
+  /// création/suppression de scène dans l'admin panel. Best-effort (le cache
+  /// reste valable en cas d'échec réseau).
+  Future<void> refreshStagesForced() async {
+    try {
+      await loadStages(force: true);
+      dataRevision.value++;
+    } catch (_) {
+      // best-effort : le cache déjà affiché reste valable
     }
   }
 

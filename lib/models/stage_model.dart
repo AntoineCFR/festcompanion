@@ -1,5 +1,6 @@
 class Stage {
   final String stage;
+  final int? stageId;
   final double latAvg;
   final double lonAvg;
   final double latAvd;  // Avant-droit
@@ -13,6 +14,7 @@ class Stage {
 
   Stage({
     required this.stage,
+    this.stageId,
     required this.latAvg,
     required this.lonAvg,
     required this.latAvd,
@@ -28,6 +30,7 @@ class Stage {
   factory Stage.fromJson(Map<String, dynamic> json) {
     return Stage(
       stage: json['stage'] as String? ?? '',
+      stageId: (json['stage_id'] as num?)?.toInt(),
       latAvg: (json['lat_avg'] as num?)?.toDouble() ?? 0.0,
       lonAvg: (json['lon_avg'] as num?)?.toDouble() ?? 0.0,
       latAvd: (json['lat_avd'] as num?)?.toDouble() ?? 0.0,
@@ -43,6 +46,7 @@ class Stage {
 
   Stage copyWith({
     String? stage,
+    int? stageId,
     double? latAvg,
     double? lonAvg,
     double? latAvd,
@@ -56,6 +60,7 @@ class Stage {
   }) {
     return Stage(
       stage: stage ?? this.stage,
+      stageId: stageId ?? this.stageId,
       latAvg: latAvg ?? this.latAvg,
       lonAvg: lonAvg ?? this.lonAvg,
       latAvd: latAvd ?? this.latAvd,
@@ -72,6 +77,7 @@ class Stage {
   Map<String, dynamic> toJson() {
     return {
       'stage': stage,
+      'stage_id': stageId,
       'lat_avg': latAvg,
       'lon_avg': lonAvg,
       'lat_avd': latAvd,
