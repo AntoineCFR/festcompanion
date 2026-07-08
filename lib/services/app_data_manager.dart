@@ -282,6 +282,15 @@ class AppDataManager {
   List<Stage> get stages => _stages;
   bool get isLoadingStages => _isLoadingStages;
 
+  /// Ordre d'affichage EXPLICITE par scène (`Stage.stageOrder`, posé via
+  /// l'admin panel) — prime sur l'ordre dérivé par set (`TimetableItem.
+  /// stageOrder`, posé par le scraper) partout où des scènes sont triées
+  /// (Scènes, admin panel, Line-up, Timetable).
+  Map<String, int> get explicitStageOrder => {
+        for (final s in _stages)
+          if (s.stageOrder != null) s.stage: s.stageOrder!,
+      };
+
   // Getters pour les événements (typé)
   List<Event> get userEvents => _userEvents;
   bool get isLoadingEvents => _isLoadingEvents;

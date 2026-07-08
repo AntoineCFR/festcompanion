@@ -10,6 +10,7 @@ class TimetableHelper {
     bool showAllUsersFavorites = false,
     List<int> allFavoriteSetIds = const [],
   }) {
+    final explicitOrder = AppDataManager().explicitStageOrder;
     final filteredByDay = timetable.where((item) => item.day == selectedDay).toList();
 
     final List<TimetableItem> displayItems;
@@ -38,9 +39,10 @@ class TimetableHelper {
         if (startCompare != 0) return startCompare;
         int endCompare = a.endTime.compareTo(b.endTime);
         if (endCompare != 0) return endCompare;
-        return TimetableItem.compareByStage(a, b);
+        return TimetableItem.compareByStage(a, b, explicitOrder: explicitOrder);
       } else {
-        int stageCompare = TimetableItem.compareByStage(a, b);
+        int stageCompare =
+            TimetableItem.compareByStage(a, b, explicitOrder: explicitOrder);
         if (stageCompare != 0) return stageCompare;
         return a.startTime.compareTo(b.startTime);
       }
