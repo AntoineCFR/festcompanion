@@ -497,6 +497,156 @@ class ApiService {
     }
   }
 
+  /// Crée une scène (admin panel). [stageName] doit être unique pour le festival.
+  static Future<Map<String, dynamic>> createStage(String stageName,
+      {required int userId, int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/api/stages');
+      final response = await _client.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId, 'stage': stageName}),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec createStage: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la création de la scène: $e');
+    }
+  }
+
+  /// Supprime une scène (admin panel). Échoue si des sets actifs la référencent
+  /// encore (message d'erreur du backend, à afficher tel quel).
+  static Future<void> deleteStage(String stageName,
+      {required int userId, int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/api/stages/$stageName');
+      final response = await _client.delete(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Échec deleteStage: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la suppression de la scène: $e');
+    }
+  }
+
+  // ========== SETS (admin panel) ==========
+
+  /// Crée un set manuellement (admin panel). [data] : dj, stage, host
+  /// (optionnel), day, day_int, stage_order (optionnel), bio (optionnel),
+  /// start_time, end_time (ISO 8601).
+  static Future<Map<String, dynamic>> createSet(Map<String, dynamic> data,
+      {required int userId, int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/timetable');
+      final response = await _client.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId, ...data}),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec createSet: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la création du set: $e');
+    }
+  }
+
+  /// Modifie un set existant (admin panel). Champs absents de [data] = valeur
+  /// existante conservée.
+  static Future<Map<String, dynamic>> updateSet(int setId, Map<String, dynamic> data,
+      {required int userId, int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/timetable/$setId');
+      final response = await _client.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId, ...data}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec updateSet: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la mise à jour du set: $e');
+    }
+  }
+
+  /// Supprime (soft-delete) un set (admin panel).
+  static Future<void> deleteSet(int setId, {required int userId, int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/timetable/$setId');
+      final response = await _client.delete(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Échec deleteSet: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la suppression du set: $e');
+    }
+  }
+
+  /// Aperçu (dry-run, [apply]=false) OU application ([apply]=true) des
+  /// changements de line-up détectés par le scraper — liste complète
+  /// (ajouts/reprogrammations/annulations/restaurations), pas juste des
+  /// compteurs. [apply]=true réutilise le chemin réel du scraper (garde-fou
+  /// anti-désactivation massive inclus, champs complets), plutôt qu'un rejeu
+  /// partiel via createSet/updateSet/deleteSet.
+  static Future<Map<String, dynamic>> previewLineupChanges(
+      {required int userId, int? festivalId, bool apply = false}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/api/admin/timetable-preview');
+      final response = await _client.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'festival_id': fid, 'user_id': userId, 'apply': apply}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec previewLineupChanges: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec de la prévisualisation du line-up: $e');
+    }
+  }
+
   // ========== GÉOLOC ==========
 
   static Future<Map<String, dynamic>> updateGeoloc({

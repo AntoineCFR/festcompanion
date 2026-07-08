@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../pages/profile_page.dart';
 import '../../pages/team_page.dart';
 import '../../pages/stages_page.dart';
+import '../../pages/admin_panel_page.dart';
 import '../../pages/journal_page.dart';
 import '../../pages/festival_selection_page.dart';
 import '../../pages/theme_page.dart';
@@ -114,6 +115,11 @@ class MainDrawer extends StatelessWidget {
               label: 'Scènes',
               onTap: () =>
                   _push(context, StagesPage(username: username, userId: userId))),
+          _tile(context,
+              icon: Icons.admin_panel_settings,
+              label: 'Administration',
+              onTap: () => _push(context,
+                  AdminPanelPage(username: username, userId: userId))),
 
           const Divider(color: Colors.white24),
 
