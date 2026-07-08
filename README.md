@@ -114,6 +114,12 @@ Three one-tap event types broadcast to everyone via Firebase Cloud Messaging:
 - A **hydration reminder** every 2 h through each festival day, with day-themed copy (escalating from serious to silly) — tapping it jumps to Events to log a drink.
 - Scheduled at the festival's **wall-clock time** via its IANA timezone, so they fire correctly whatever timezone the phone is in; rescheduled whenever favorites change.
 
+### 🛠️ Admin panel
+- Drawer-accessible **Administration** screen (role-gated: content only renders for `user_role == 'admin'`), with **Scènes** and **Sets** tabs.
+- **Stages**: create, rename and delete, sorted by display order. A stage carries a stable `stage_id`, so renaming it propagates to every timetable set already linked instead of breaking the link (previously matched by name only). A stage's display order can be set explicitly instead of only being derived from its sets — useful for a brand-new stage with none yet.
+- **Sets**: manually create, edit and soft-delete a timetable entry, grouped by day then stage (in display order) and sorted by start time.
+- **Line-up preview**: a full-screen diff of what the scraper would change — grouped by change type, before/after schedule shown per entry, with a checkbox per entry (and a bulk toggle per group) to exclude specific changes before applying. Applying reuses the exact same sync path as the automatic scraper (including the anti-mass-cancellation guard), so a partial apply can't skip that safety net.
+
 ### 🏕️ Tent / camp location
 - Save your **tent location** per festival (Mon compte) and navigate back to it — the 4 a.m. you, compass broken, will be grateful.
 
@@ -286,6 +292,12 @@ Ideas not yet implemented:
 ---
 
 ## Release notes
+
+### 1.8.0 — 2026-07-08
+- **Admin panel.** New role-gated **Administration** screen (drawer entry): manage stages (create/rename/delete, explicit display order) and timetable sets (create/edit/soft-delete) by hand, without touching BigQuery directly.
+- **Line-up preview with selection.** The scraper's dry-run diff is no longer an all-or-nothing apply: a dedicated screen groups detected changes by type, shows the actual before/after schedule per entry, and lets the admin uncheck individual entries (or a whole group in one tap) before applying — needed once real usage showed 100+ changes at once, many of them false positives (manually-added sets not yet picked up by the scraped source).
+- **Stable stage identity (`stage_id`).** Stages now carry a numeric id independent of their display name, so renaming a stage no longer orphans the sets already scheduled on it.
+- **No more fixed timetable refresh slots.** Removed the 12/18/22h gating on background timetable revalidation — the app already shows the cached line-up instantly and refreshes silently in the background (a subtle banner, never blocking), so there's no longer a reason to delay that revalidation to fixed times of day. Line-up updates now reach users as soon as they next open the app, instead of waiting for the next slot.
 
 ### 1.7.1 — 2026-06-27
 - **Weather availability window.** The home weather section now opens exactly when

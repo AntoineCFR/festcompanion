@@ -186,16 +186,11 @@ class LocalStorageService {
   Future<void> saveTimetable(List<TimetableItem> timetable, int festivalId) async {
     final List<String> timetableJson = timetable.map((item) => jsonEncode(item.toJson())).toList();
     await _prefs.setStringList('${_timetableKey}_$festivalId', timetableJson);
-    // Horodatage du fetch → permet de savoir si le cache est encore frais
-    // (cf. créneaux de rafraîchissement de la timetable).
+    // Horodatage du fetch (bookkeeping — plus lu par AppDataManager depuis la
+    // suppression des créneaux de rafraîchissement fixes, gardé pour un futur
+    // usage éventuel type "dernière mise à jour : il y a 5 min").
     await _prefs.setString(
         '${_timetableTsKey}_$festivalId', DateTime.now().toIso8601String());
-  }
-
-  /// Date du dernier enregistrement de la timetable (null si jamais).
-  DateTime? getTimetableTimestamp(int festivalId) {
-    final s = _prefs.getString('${_timetableTsKey}_$festivalId');
-    return s == null ? null : DateTime.tryParse(s);
   }
 
   Future<List<TimetableItem>> getTimetable(int festivalId) async {

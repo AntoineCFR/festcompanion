@@ -379,28 +379,14 @@ class AppDataManager {
     }
   }
 
-  /// Créneaux de rafraîchissement de la timetable (heures locales). Le line-up
-  /// bouge très rarement → inutile de le re-télécharger entre deux créneaux.
-  static const List<int> timetableRefreshHours = [12, 18, 22];
-
-  /// Dernier créneau de rafraîchissement atteint à [now] (avant 12h = 22h veille).
-  static DateTime _latestTimetableSlot(DateTime now) {
-    final midnight = DateTime(now.year, now.month, now.day);
-    DateTime? slot;
-    for (final h in timetableRefreshHours) {
-      final b = midnight.add(Duration(hours: h));
-      if (!b.isAfter(now)) slot = b;
-    }
-    return slot ??
-        midnight.subtract(const Duration(days: 1)).add(const Duration(hours: 22));
-  }
-
   // Charge la timetable du festival sélectionné.
   //
-  // Par défaut, **réutilise le cache local** tant qu'aucun créneau de
-  // rafraîchissement (12/18/22h) n'est passé depuis le dernier fetch → pas de
-  // requête réseau superflue au démarrage (le line-up change rarement). Passer
-  // [force] pour ignorer le cache (ex. pull-to-refresh).
+  // Par défaut, **affiche le cache local immédiatement** (zéro réseau sur le
+  // chemin critique de démarrage) PUIS revalide systématiquement en arrière-
+  // plan (discret — pastille, pas de blocage) : plus de créneaux fixes
+  // (12/18/22h), les mises à jour de line-up remontent dès le prochain
+  // lancement/accès plutôt que d'attendre le créneau suivant. Passer [force]
+  // pour un fetch bloquant immédiat (ex. pull-to-refresh, notif push).
   // Garde anti-concurrence : un seul chargement timetable en vol à la fois ;
   // les appels concurrents partagent le même Future (évite N téléchargements
   // parallèles du gros payload bios → request storm).
@@ -421,17 +407,15 @@ class AppDataManager {
 
     if (!force) {
       // Stale-while-revalidate : si on a un cache local, on l'affiche
-      // IMMÉDIATEMENT (zéro réseau sur le chemin critique de démarrage). On ne
-      // re-télécharge le gros payload (bios) qu'en ARRIÈRE-PLAN, et seulement si
-      // un créneau (12/18/22h) est passé depuis le dernier fetch.
+      // IMMÉDIATEMENT (zéro réseau sur le chemin critique de démarrage), puis
+      // on revalide systématiquement en arrière-plan (le gros payload bios
+      // inclus) — _refreshTimetableInBackground est déjà protégé contre les
+      // appels concurrents (_timetableRefreshing) donc pas de risque de spam.
       final cached = await LocalStorageService().getTimetable(fid);
       if (cached.isNotEmpty) {
         _timetable = cached;
         _ensureValidSelectedDay();
-        final ts = LocalStorageService().getTimetableTimestamp(fid);
-        final stale =
-            ts == null || ts.isBefore(_latestTimetableSlot(DateTime.now()));
-        if (stale) _refreshTimetableInBackground(fid);
+        _refreshTimetableInBackground(fid);
         return;
       }
     }
