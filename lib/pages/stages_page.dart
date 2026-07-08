@@ -53,22 +53,24 @@ class _StagesPageState extends State<StagesPage> {
     }).catchError((_) {});
   }
 
-  /// Trie les scènes selon `stage_order` du festival et rafraîchit l'UI.
+  /// Trie les scènes selon leur ordre d'affichage et rafraîchit l'UI.
   /// Idempotent (appelé pour les scènes puis pour le rôle utilisateur).
   void _applyData() {
-    // Ordre d'affichage = `stage_order` du festival. La table `stages`
-    // (géoloc) ne le porte pas, mais la timetable si → on en dérive un ordre
-    // par nom de scène, avec repli alphabétique insensible à la casse pour les
-    // scènes absentes de la timetable.
-    final orderByStage = <String, int>{};
+    // Ordre d'affichage : `stage.stageOrder` explicite (posé par un admin
+    // dans l'admin panel) prime s'il existe. Sinon repli sur l'ordre dérivé
+    // de la timetable (posé par les sets — la table `stages` géoloc ne le
+    // portait pas jusqu'à l'ajout de la colonne explicite), puis alphabétique
+    // insensible à la casse pour les scènes sans aucun des deux.
+    final derivedOrderByStage = <String, int>{};
     for (final item in AppDataManager().timetable) {
       final o = item.stageOrder;
-      if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
+      if (o != null) derivedOrderByStage.putIfAbsent(item.stage, () => o);
     }
+    int? effectiveOrder(Stage s) => s.stageOrder ?? derivedOrderByStage[s.stage];
     final stages = List<Stage>.from(AppDataManager().stages)
       ..sort((a, b) {
-        final oa = orderByStage[a.stage];
-        final ob = orderByStage[b.stage];
+        final oa = effectiveOrder(a);
+        final ob = effectiveOrder(b);
         if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
         if (oa != null && ob == null) return -1;
         if (oa == null && ob != null) return 1;

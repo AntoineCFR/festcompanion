@@ -1,6 +1,7 @@
 class Stage {
   final String stage;
   final int? stageId;
+  final int? stageOrder;
   final double latAvg;
   final double lonAvg;
   final double latAvd;  // Avant-droit
@@ -15,6 +16,7 @@ class Stage {
   Stage({
     required this.stage,
     this.stageId,
+    this.stageOrder,
     required this.latAvg,
     required this.lonAvg,
     required this.latAvd,
@@ -31,6 +33,7 @@ class Stage {
     return Stage(
       stage: json['stage'] as String? ?? '',
       stageId: (json['stage_id'] as num?)?.toInt(),
+      stageOrder: (json['stage_order'] as num?)?.toInt(),
       latAvg: (json['lat_avg'] as num?)?.toDouble() ?? 0.0,
       lonAvg: (json['lon_avg'] as num?)?.toDouble() ?? 0.0,
       latAvd: (json['lat_avd'] as num?)?.toDouble() ?? 0.0,
@@ -47,6 +50,7 @@ class Stage {
   Stage copyWith({
     String? stage,
     int? stageId,
+    int? stageOrder,
     double? latAvg,
     double? lonAvg,
     double? latAvd,
@@ -61,6 +65,7 @@ class Stage {
     return Stage(
       stage: stage ?? this.stage,
       stageId: stageId ?? this.stageId,
+      stageOrder: stageOrder ?? this.stageOrder,
       latAvg: latAvg ?? this.latAvg,
       lonAvg: lonAvg ?? this.lonAvg,
       latAvd: latAvd ?? this.latAvd,
@@ -78,6 +83,7 @@ class Stage {
     return {
       'stage': stage,
       'stage_id': stageId,
+      'stage_order': stageOrder,
       'lat_avg': latAvg,
       'lon_avg': lonAvg,
       'lat_avd': latAvd,

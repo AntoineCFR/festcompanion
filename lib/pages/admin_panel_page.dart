@@ -146,19 +146,21 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
 
   // ========== SCÈNES ==========
 
-  /// Scènes triées par `stage_order` (dérivé de la timetable — la table
-  /// `stages` géoloc ne le porte pas elle-même), repli alphabétique
-  /// insensible à la casse — même logique que StagesPage._applyData.
+  /// Scènes triées par ordre d'affichage : `stage.stageOrder` explicite
+  /// (posé par l'admin) prime s'il existe, sinon repli sur l'ordre dérivé de
+  /// la timetable (posé par les sets), sinon alphabétique insensible à la
+  /// casse — même logique que StagesPage._applyData.
   List<Stage> get _sortedStages {
-    final orderByStage = <String, int>{};
+    final derivedOrderByStage = <String, int>{};
     for (final item in AppDataManager().timetable) {
       final o = item.stageOrder;
-      if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
+      if (o != null) derivedOrderByStage.putIfAbsent(item.stage, () => o);
     }
+    int? effectiveOrder(Stage s) => s.stageOrder ?? derivedOrderByStage[s.stage];
     final stages = List<Stage>.from(AppDataManager().stages)
       ..sort((a, b) {
-        final oa = orderByStage[a.stage];
-        final ob = orderByStage[b.stage];
+        final oa = effectiveOrder(a);
+        final ob = effectiveOrder(b);
         if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
         if (oa != null && ob == null) return -1;
         if (oa == null && ob != null) return 1;
@@ -287,26 +289,30 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     }
   }
 
-  /// Renomme une scène. Identifiée par `stage.stageId` (pas par le nom
-  /// courant) : c'est justement ce que `stage_id` permet — le renommage
-  /// propage vers les sets déjà liés sans casser leur lien.
+  /// Modifie le nom et/ou l'ordre d'affichage d'une scène. Identifiée par
+  /// `stage.stageId` (pas par le nom courant) : c'est justement ce que
+  /// `stage_id` permet — le renommage propage vers les sets déjà liés sans
+  /// casser leur lien. L'ordre explicite prime sur celui dérivé des sets
+  /// (utile pour une scène toute neuve, qui n'a encore aucun set).
   Future<void> _renameStageDialog(Stage stage) async {
     final stageId = stage.stageId;
     if (stageId == null) {
       AppDataManager().showSnackBar(
           'Cette scène n\'a pas encore de stage_id (migration pas appliquée '
-          'ou scène créée avant) — renommage indisponible.');
+          'ou scène créée avant) — modification indisponible.');
       return;
     }
     final nameCtrl = TextEditingController(text: stage.stage);
+    final orderCtrl =
+        TextEditingController(text: stage.stageOrder?.toString() ?? '');
     String? error;
 
-    final newName = await showDialog<String>(
+    final result = await showDialog<(String, int?)>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: AppTheme.surface,
-          title: const Text('Renommer la scène',
+          title: const Text('Modifier la scène',
               style: TextStyle(color: Colors.white, fontSize: 17)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -317,7 +323,16 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                 autofocus: true,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
-                  labelText: 'Nouveau nom',
+                  labelText: 'Nom',
+                  labelStyle: TextStyle(color: Colors.white70),
+                ),
+              ),
+              TextField(
+                controller: orderCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Ordre d\'affichage (optionnel, vide = auto)',
                   labelStyle: TextStyle(color: Colors.white70),
                 ),
               ),
@@ -341,25 +356,36 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                   setDialogState(() => error = 'Nom requis');
                   return;
                 }
-                Navigator.pop(ctx, trimmed);
+                final orderText = orderCtrl.text.trim();
+                int? order;
+                if (orderText.isNotEmpty) {
+                  order = int.tryParse(orderText);
+                  if (order == null) {
+                    setDialogState(
+                        () => error = 'Ordre d\'affichage : nombre entier');
+                    return;
+                  }
+                }
+                Navigator.pop(ctx, (trimmed, order));
               },
-              child: const Text('Renommer'),
+              child: const Text('Enregistrer'),
             ),
           ],
         ),
       ),
     );
-    if (newName == null || newName == stage.stage || !mounted) return;
+    if (result == null || !mounted) return;
+    final (newName, newOrder) = result;
+    if (newName == stage.stage && newOrder == stage.stageOrder) return;
 
     setState(() => _busy = true);
     try {
-      await ApiService.renameStage(stage.stage, stageId, newName,
+      await ApiService.updateStageDetails(stage.stage, stageId, newName, newOrder,
           userId: widget.userId);
       await AppDataManager().refreshStagesForced();
       await AppDataManager().refreshTimetableForced();
       if (mounted) {
-        AppDataManager()
-            .showSnackBar('Scène renommée en « $newName ».');
+        AppDataManager().showSnackBar('Scène « $newName » mise à jour.');
       }
     } catch (e) {
       if (mounted) AppDataManager().showSnackBar('Erreur : $e');
@@ -405,26 +431,33 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
   // ========== SETS ==========
 
   /// Sets groupés par jour (ordre chronologique via `dayInt`), puis par
-  /// scène au sein du jour (ordre `stage_order`, repli alphabétique — même
-  /// dérivation que [_sortedStages]), triés par horaire au sein de chaque
-  /// sous-groupe jour/scène.
+  /// scène au sein du jour (`stage.stageOrder` explicite en priorité, repli
+  /// sur l'ordre dérivé de la timetable, puis alphabétique — même dérivation
+  /// que [_sortedStages]), triés par horaire au sein de chaque sous-groupe
+  /// jour/scène.
   List<Widget> _buildGroupedSetItems() {
     final allSets = AppDataManager().timetable;
     if (allSets.isEmpty) return const [];
 
     final dayIntByDay = <String, int>{};
-    final orderByStage = <String, int>{};
+    final derivedOrderByStage = <String, int>{};
     for (final item in allSets) {
       dayIntByDay.putIfAbsent(item.day, () => item.dayInt);
       final o = item.stageOrder;
-      if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
+      if (o != null) derivedOrderByStage.putIfAbsent(item.stage, () => o);
     }
+    final explicitOrderByStage = <String, int>{
+      for (final s in AppDataManager().stages)
+        if (s.stageOrder != null) s.stage: s.stageOrder!,
+    };
     final days = dayIntByDay.keys.toList()
       ..sort((a, b) => dayIntByDay[a]!.compareTo(dayIntByDay[b]!));
 
+    int? orderFor(String stage) =>
+        explicitOrderByStage[stage] ?? derivedOrderByStage[stage];
     int compareStages(String a, String b) {
-      final oa = orderByStage[a];
-      final ob = orderByStage[b];
+      final oa = orderFor(a);
+      final ob = orderFor(b);
       if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
       if (oa != null && ob == null) return -1;
       if (oa == null && ob != null) return 1;
