@@ -108,4 +108,10 @@ class TimetableItem {
     }
     return a.stage.toLowerCase().compareTo(b.stage.toLowerCase());
   }
+
+  /// Libellé affiché pour une scène : "{stage}" si aucun collectif ne
+  /// l'anime, "{stage} - {host}" sinon (ex. une même scène tenue par un
+  /// collectif différent selon le jour du festival).
+  static String stageLabel(String stage, String host) =>
+      host.trim().isEmpty ? stage : '$stage - ${host.trim()}';
 }

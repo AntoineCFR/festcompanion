@@ -145,7 +145,10 @@ class _LineupPageState extends State<LineupPage> {
                                     vertical: 8,
                                   ),
                                   child: Text(
-                                    stageEntry.key,
+                                    TimetableItem.stageLabel(
+                                      stageEntry.key,
+                                      stageEntry.value.first.host,
+                                    ),
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w600,
