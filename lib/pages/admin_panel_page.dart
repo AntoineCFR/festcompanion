@@ -146,8 +146,29 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
 
   // ========== SCÈNES ==========
 
+  /// Scènes triées par `stage_order` (dérivé de la timetable — la table
+  /// `stages` géoloc ne le porte pas elle-même), repli alphabétique
+  /// insensible à la casse — même logique que StagesPage._applyData.
+  List<Stage> get _sortedStages {
+    final orderByStage = <String, int>{};
+    for (final item in AppDataManager().timetable) {
+      final o = item.stageOrder;
+      if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
+    }
+    final stages = List<Stage>.from(AppDataManager().stages)
+      ..sort((a, b) {
+        final oa = orderByStage[a.stage];
+        final ob = orderByStage[b.stage];
+        if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
+        if (oa != null && ob == null) return -1;
+        if (oa == null && ob != null) return 1;
+        return a.stage.toLowerCase().compareTo(b.stage.toLowerCase());
+      });
+    return stages;
+  }
+
   Widget _buildStagesTab() {
-    final stages = AppDataManager().stages;
+    final stages = _sortedStages;
     return Column(
       children: [
         Padding(
@@ -183,9 +204,18 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         title: Text(stage.stage, style: const TextStyle(color: Colors.white)),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-          onPressed: _busy ? null : () => _deleteStage(stage.stage),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.white70),
+              onPressed: _busy ? null : () => _renameStageDialog(stage),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              onPressed: _busy ? null : () => _deleteStage(stage.stage),
+            ),
+          ],
         ),
       ),
     );
@@ -257,6 +287,87 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     }
   }
 
+  /// Renomme une scène. Identifiée par `stage.stageId` (pas par le nom
+  /// courant) : c'est justement ce que `stage_id` permet — le renommage
+  /// propage vers les sets déjà liés sans casser leur lien.
+  Future<void> _renameStageDialog(Stage stage) async {
+    final stageId = stage.stageId;
+    if (stageId == null) {
+      AppDataManager().showSnackBar(
+          'Cette scène n\'a pas encore de stage_id (migration pas appliquée '
+          'ou scène créée avant) — renommage indisponible.');
+      return;
+    }
+    final nameCtrl = TextEditingController(text: stage.stage);
+    String? error;
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text('Renommer la scène',
+              style: TextStyle(color: Colors.white, fontSize: 17)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Nouveau nom',
+                  labelStyle: TextStyle(color: Colors.white70),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(error!,
+                    style: const TextStyle(
+                        color: Colors.redAccent, fontSize: 12)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () {
+                final trimmed = nameCtrl.text.trim();
+                if (trimmed.isEmpty) {
+                  setDialogState(() => error = 'Nom requis');
+                  return;
+                }
+                Navigator.pop(ctx, trimmed);
+              },
+              child: const Text('Renommer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (newName == null || newName == stage.stage || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await ApiService.renameStage(stage.stage, stageId, newName,
+          userId: widget.userId);
+      await AppDataManager().refreshStagesForced();
+      await AppDataManager().refreshTimetableForced();
+      if (mounted) {
+        AppDataManager()
+            .showSnackBar('Scène renommée en « $newName ».');
+      }
+    } catch (e) {
+      if (mounted) AppDataManager().showSnackBar('Erreur : $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _deleteStage(String stageName) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -293,10 +404,73 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
 
   // ========== SETS ==========
 
-  Widget _buildSetsTab() {
-    final sets = List<TimetableItem>.from(AppDataManager().timetable)
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+  /// Sets groupés par jour (ordre chronologique via `dayInt`), puis par
+  /// scène au sein du jour (ordre `stage_order`, repli alphabétique — même
+  /// dérivation que [_sortedStages]), triés par horaire au sein de chaque
+  /// sous-groupe jour/scène.
+  List<Widget> _buildGroupedSetItems() {
+    final allSets = AppDataManager().timetable;
+    if (allSets.isEmpty) return const [];
 
+    final dayIntByDay = <String, int>{};
+    final orderByStage = <String, int>{};
+    for (final item in allSets) {
+      dayIntByDay.putIfAbsent(item.day, () => item.dayInt);
+      final o = item.stageOrder;
+      if (o != null) orderByStage.putIfAbsent(item.stage, () => o);
+    }
+    final days = dayIntByDay.keys.toList()
+      ..sort((a, b) => dayIntByDay[a]!.compareTo(dayIntByDay[b]!));
+
+    int compareStages(String a, String b) {
+      final oa = orderByStage[a];
+      final ob = orderByStage[b];
+      if (oa != null && ob != null && oa != ob) return oa.compareTo(ob);
+      if (oa != null && ob == null) return -1;
+      if (oa == null && ob != null) return 1;
+      return a.toLowerCase().compareTo(b.toLowerCase());
+    }
+
+    final widgets = <Widget>[];
+    for (final day in days) {
+      final daySets = allSets.where((s) => s.day == day).toList();
+      final stages = daySets.map((s) => s.stage).toSet().toList()
+        ..sort(compareStages);
+
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(top: 16, bottom: 4),
+        child: Text(
+          AppUtils.getDayName(day),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 17,
+          ),
+        ),
+      ));
+      for (final stage in stages) {
+        final stageSets = daySets.where((s) => s.stage == stage).toList()
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4, left: 4),
+          child: Text(
+            stage,
+            style: TextStyle(
+              color: AppTheme.accent,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ));
+        for (final item in stageSets) {
+          widgets.add(_buildSetRow(item));
+        }
+      }
+    }
+    return widgets;
+  }
+
+  Widget _buildSetsTab() {
     return Column(
       children: [
         Padding(
@@ -321,14 +495,13 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
           ),
         ),
         Expanded(
-          child: sets.isEmpty
+          child: AppDataManager().timetable.isEmpty
               ? const Center(
                   child: Text('Aucun set',
                       style: TextStyle(color: Colors.white70)))
-              : ListView.builder(
+              : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  itemCount: sets.length,
-                  itemBuilder: (context, index) => _buildSetRow(sets[index]),
+                  children: _buildGroupedSetItems(),
                 ),
         ),
       ],
@@ -341,10 +514,13 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         title: Text(item.dj, style: const TextStyle(color: Colors.white)),
+        // Jour et scène sont déjà les en-têtes du groupe/sous-groupe — pas
+        // besoin de les répéter ici.
         subtitle: Text(
-          '${TimetableItem.stageLabel(item.stage, item.host)} · '
-          '${AppUtils.getDayName(item.day)} '
-          '${AppUtils.formatTime(item.startTime)}-${AppUtils.formatTime(item.endTime)}',
+          item.host.trim().isEmpty
+              ? '${AppUtils.formatTime(item.startTime)}-${AppUtils.formatTime(item.endTime)}'
+              : '${item.host} · ${AppUtils.formatTime(item.startTime)}-'
+                  '${AppUtils.formatTime(item.endTime)}',
           style: const TextStyle(color: Colors.white70),
         ),
         trailing: Row(
@@ -629,6 +805,19 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
         .cast<Map<String, dynamic>>();
     if (detail.isEmpty) {
       AppDataManager().showSnackBar('Aucun changement détecté.');
+      return;
+    }
+    // Le tri/l'exclusion par entrée dépend de `change['key']`, ajouté au
+    // backend en même temps que le support de l'apply partiel. Si le serveur
+    // tourne encore sur une version antérieure (redéploiement pas terminé),
+    // cette clé est absente : on le signale clairement plutôt que de laisser
+    // les cases à cocher échouer silencieusement (exception avalée par le
+    // gestionnaire de gestes Flutter, aucun retour visuel).
+    if (detail.any((c) => c['key'] == null)) {
+      AppDataManager().showSnackBar(
+          'Le serveur ne renvoie pas encore les infos nécessaires à la '
+          'sélection — le redéploiement backend n\'est probablement pas '
+          'terminé. Réessaie dans une minute.');
       return;
     }
 

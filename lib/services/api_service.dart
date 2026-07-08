@@ -521,6 +521,37 @@ class ApiService {
     }
   }
 
+  /// Renomme une scène (admin panel), ciblée par [stageId] (clé stable) — pas
+  /// par son nom courant. Propage le nouveau nom aux sets déjà liés.
+  static Future<Map<String, dynamic>> renameStage(
+      String stageName, int stageId, String newName,
+      {required int userId, int? festivalId}) async {
+    try {
+      final fid = _requireFestival(festivalId);
+      final url = Uri.parse('$_baseUrl/api/stages/$stageName/rename');
+      final response = await _client.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'festival_id': fid,
+          'user_id': userId,
+          'stage_id': stageId,
+          'new_stage': newName,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception(
+          'Échec renameStage: Status ${response.statusCode} - Body: ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Échec du renommage de la scène: $e');
+    }
+  }
+
   /// Supprime une scène (admin panel). Échoue si des sets actifs la référencent
   /// encore (message d'erreur du backend, à afficher tel quel).
   static Future<void> deleteStage(String stageName,
