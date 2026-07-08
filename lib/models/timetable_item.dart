@@ -93,12 +93,17 @@ class TimetableItem {
   }
 
   /// Ordre d'affichage des scènes :
-  /// - par `stageOrder` (ordre voulu du festival, fourni par le scraper) si dispo ;
+  /// - par [explicitOrder]`[stage]` (ordre explicite posé sur la scène via
+  ///   l'admin panel — `Stage.stageOrder`) si fourni et présent pour cette
+  ///   scène ;
+  /// - sinon par `stageOrder` (ordre du festival dérivé par set, fourni par
+  ///   le scraper) si dispo ;
   /// - sinon repli alphabétique INSENSIBLE à la casse (ex. anciennes données
   ///   sans stage_order), ce qui évite que les noms en MAJUSCULES remontent en tête.
-  static int compareByStage(TimetableItem a, TimetableItem b) {
-    final ao = a.stageOrder;
-    final bo = b.stageOrder;
+  static int compareByStage(TimetableItem a, TimetableItem b,
+      {Map<String, int>? explicitOrder}) {
+    final ao = explicitOrder?[a.stage] ?? a.stageOrder;
+    final bo = explicitOrder?[b.stage] ?? b.stageOrder;
     if (ao != null && bo != null) {
       if (ao != bo) return ao.compareTo(bo);
     } else if (ao != null) {

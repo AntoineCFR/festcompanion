@@ -446,10 +446,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
       final o = item.stageOrder;
       if (o != null) derivedOrderByStage.putIfAbsent(item.stage, () => o);
     }
-    final explicitOrderByStage = <String, int>{
-      for (final s in AppDataManager().stages)
-        if (s.stageOrder != null) s.stage: s.stageOrder!,
-    };
+    final explicitOrderByStage = AppDataManager().explicitStageOrder;
     final days = dayIntByDay.keys.toList()
       ..sort((a, b) => dayIntByDay[a]!.compareTo(dayIntByDay[b]!));
 
