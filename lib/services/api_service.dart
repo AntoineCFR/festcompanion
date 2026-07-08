@@ -521,10 +521,12 @@ class ApiService {
     }
   }
 
-  /// Renomme une scène (admin panel), ciblée par [stageId] (clé stable) — pas
-  /// par son nom courant. Propage le nouveau nom aux sets déjà liés.
-  static Future<Map<String, dynamic>> renameStage(
-      String stageName, int stageId, String newName,
+  /// Modifie le nom et/ou l'ordre d'affichage d'une scène (admin panel),
+  /// ciblée par [stageId] (clé stable) — pas par son nom courant. Un
+  /// renommage propage le nouveau nom aux sets déjà liés. [stageOrder] null
+  /// efface l'ordre explicite (repli sur l'ordre dérivé des sets).
+  static Future<Map<String, dynamic>> updateStageDetails(
+      String stageName, int stageId, String newName, int? stageOrder,
       {required int userId, int? festivalId}) async {
     try {
       final fid = _requireFestival(festivalId);
@@ -537,6 +539,7 @@ class ApiService {
           'user_id': userId,
           'stage_id': stageId,
           'new_stage': newName,
+          'stage_order': stageOrder,
         }),
       );
 
@@ -544,11 +547,11 @@ class ApiService {
         return json.decode(response.body);
       } else {
         throw Exception(
-          'Échec renameStage: Status ${response.statusCode} - Body: ${response.body}',
+          'Échec updateStageDetails: Status ${response.statusCode} - Body: ${response.body}',
         );
       }
     } catch (e) {
-      throw Exception('Échec du renommage de la scène: $e');
+      throw Exception('Échec de la mise à jour de la scène: $e');
     }
   }
 
