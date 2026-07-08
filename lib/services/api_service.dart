@@ -623,16 +623,27 @@ class ApiService {
   /// (ajouts/reprogrammations/annulations/restaurations), pas juste des
   /// compteurs. [apply]=true réutilise le chemin réel du scraper (garde-fou
   /// anti-désactivation massive inclus, champs complets), plutôt qu'un rejeu
-  /// partiel via createSet/updateSet/deleteSet.
-  static Future<Map<String, dynamic>> previewLineupChanges(
-      {required int userId, int? festivalId, bool apply = false}) async {
+  /// partiel via createSet/updateSet/deleteSet. [exclude] (apply seulement) :
+  /// `change['key']` des entrées détectées à NE PAS appliquer (rejetées par
+  /// l'admin dans l'aperçu).
+  static Future<Map<String, dynamic>> previewLineupChanges({
+    required int userId,
+    int? festivalId,
+    bool apply = false,
+    List<String> exclude = const [],
+  }) async {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/admin/timetable-preview');
       final response = await _client.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'festival_id': fid, 'user_id': userId, 'apply': apply}),
+        body: json.encode({
+          'festival_id': fid,
+          'user_id': userId,
+          'apply': apply,
+          'exclude': exclude,
+        }),
       );
 
       if (response.statusCode == 200) {

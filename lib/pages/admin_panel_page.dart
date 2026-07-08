@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/app_data_manager.dart';
 import '../utils/utils.dart';
 import '../widgets/shared/festival_background.dart';
+import 'lineup_preview_page.dart';
 
 /// Écran admin (scènes + sets manuels). Visible depuis le drawer pour tout le
 /// monde — comme "Scènes" — mais le contenu est filtré par rôle À L'INTÉRIEUR
@@ -604,23 +605,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     }
   }
 
-  /// Libellé lisible d'un type de changement détecté par le scraper.
-  String _changeTypeLabel(String type) {
-    switch (type) {
-      case 'added':
-        return 'Ajouté';
-      case 'rescheduled':
-        return 'Reprogrammé';
-      case 'restored':
-        return 'Restauré';
-      case 'cancelled':
-        return 'Annulé';
-      case 'updated':
-        return 'Modifié';
-    }
-    return type;
-  }
-
+  /// Lance le dry-run puis ouvre l'écran d'aperçu détaillé (avant/après,
+  /// sélection par case à cocher) — l'application réelle se fait depuis cet
+  /// écran, pas ici.
   Future<void> _previewLineupChanges() async {
     setState(() => _busy = true);
     Map<String, dynamic>? result;
@@ -638,65 +625,20 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
       return;
     }
 
-    final detail = (result['detail'] as List?) ?? const [];
+    final detail = ((result['detail'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>();
     if (detail.isEmpty) {
       AppDataManager().showSnackBar('Aucun changement détecté.');
       return;
     }
 
-    final apply = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: Text('${detail.length} changement(s) détecté(s)',
-            style: const TextStyle(color: Colors.white, fontSize: 17)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: detail.length,
-            itemBuilder: (context, index) {
-              final c = detail[index] as Map<String, dynamic>;
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  '${_changeTypeLabel(c['type'] as String? ?? '')} — '
-                  '${c['dj'] ?? ''} (${c['stage'] ?? ''}, ${c['day'] ?? ''})',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Fermer'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Appliquer tous les changements'),
-          ),
-        ],
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            LineupPreviewPage(userId: widget.userId, changes: detail),
       ),
     );
-    if (apply != true || !mounted) return;
-
-    setState(() => _busy = true);
-    try {
-      final applied = await ApiService.previewLineupChanges(
-          userId: widget.userId, apply: true);
-      await AppDataManager().refreshTimetableForced();
-      await AppDataManager().refreshStagesForced();
-      if (mounted) {
-        final pushed = applied['pushed'] ?? 0;
-        AppDataManager()
-            .showSnackBar('Line-up mis à jour ($pushed notification(s) envoyée(s)).');
-      }
-    } catch (e) {
-      if (mounted) AppDataManager().showSnackBar('Erreur : $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 }
