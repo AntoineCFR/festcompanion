@@ -13,6 +13,17 @@ class Stage {
   final double latRallyPoint;
   final double lonRallyPoint;
 
+  /// Position de la scène sur l'illustration de la carte du festival (fraction
+  /// 0-1 de la largeur/hauteur de l'image, indépendante de sa résolution).
+  /// Null (ou (0,0), valeur par défaut à la création) tant qu'aucun admin n'a
+  /// calibré la scène via l'écran dédié — la carte l'ignore alors simplement.
+  final double? mapAnchorX;
+  final double? mapAnchorY;
+
+  /// Rayon (fraction de la largeur image) autour de l'ancre à ne pas
+  /// recouvrir d'avatars — les pictogrammes de la carte varient en taille.
+  final double? mapExclusionRadius;
+
   Stage({
     required this.stage,
     this.stageId,
@@ -27,7 +38,17 @@ class Stage {
     required this.lonArd,
     required this.latRallyPoint,
     required this.lonRallyPoint,
+    this.mapAnchorX,
+    this.mapAnchorY,
+    this.mapExclusionRadius,
   });
+
+  /// True si l'ancre a été calibrée (ni absente, ni laissée à sa valeur par
+  /// défaut (0, 0) posée à la création de la scène).
+  bool get hasMapAnchor =>
+      mapAnchorX != null &&
+      mapAnchorY != null &&
+      (mapAnchorX != 0.0 || mapAnchorY != 0.0);
 
   factory Stage.fromJson(Map<String, dynamic> json) {
     return Stage(
@@ -44,6 +65,9 @@ class Stage {
       lonArd: (json['lon_ard'] as num?)?.toDouble() ?? 0.0,
       latRallyPoint: (json['lat_rally_point'] as num?)?.toDouble() ?? 0.0,
       lonRallyPoint: (json['lon_rally_point'] as num?)?.toDouble() ?? 0.0,
+      mapAnchorX: (json['map_anchor_x'] as num?)?.toDouble(),
+      mapAnchorY: (json['map_anchor_y'] as num?)?.toDouble(),
+      mapExclusionRadius: (json['map_exclusion_radius'] as num?)?.toDouble(),
     );
   }
 
@@ -61,6 +85,9 @@ class Stage {
     double? lonArd,
     double? latRallyPoint,
     double? lonRallyPoint,
+    double? mapAnchorX,
+    double? mapAnchorY,
+    double? mapExclusionRadius,
   }) {
     return Stage(
       stage: stage ?? this.stage,
@@ -76,6 +103,9 @@ class Stage {
       lonArd: lonArd ?? this.lonArd,
       latRallyPoint: latRallyPoint ?? this.latRallyPoint,
       lonRallyPoint: lonRallyPoint ?? this.lonRallyPoint,
+      mapAnchorX: mapAnchorX ?? this.mapAnchorX,
+      mapAnchorY: mapAnchorY ?? this.mapAnchorY,
+      mapExclusionRadius: mapExclusionRadius ?? this.mapExclusionRadius,
     );
   }
 
@@ -94,6 +124,9 @@ class Stage {
       'lon_ard': lonArd,
       'lat_rally_point': latRallyPoint,
       'lon_rally_point': lonRallyPoint,
+      'map_anchor_x': mapAnchorX,
+      'map_anchor_y': mapAnchorY,
+      'map_exclusion_radius': mapExclusionRadius,
     };
   }
 }

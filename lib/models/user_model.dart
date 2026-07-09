@@ -9,6 +9,9 @@ class User {
   final String? photoUrl;
   final String userRole;
   final String lastLocation; // NOUVEAU
+  /// Horodatage de la dernière position connue (pour "il y a X minutes" sur
+  /// la carte). Null si jamais localisé.
+  final DateTime? lastSeenAt;
 
   User({
     required this.id,
@@ -21,6 +24,7 @@ class User {
     this.photoUrl,
     this.userRole = 'user',
     this.lastLocation = '?', // Par défaut
+    this.lastSeenAt,
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
@@ -35,6 +39,9 @@ class User {
       photoUrl: map['photo_url'],
       userRole: map['user_role'] as String? ?? 'user',
       lastLocation: map['last_location'] as String? ?? '?',
+      lastSeenAt: map['last_seen_at'] != null
+          ? DateTime.tryParse(map['last_seen_at'] as String)
+          : null,
     );
   }
 
@@ -49,6 +56,7 @@ class User {
     String? photoUrl,
     String? userRole,
     String? lastLocation, // NOUVEAU
+    DateTime? lastSeenAt,
   }) {
     return User(
       id: id ?? this.id,
@@ -61,6 +69,7 @@ class User {
       photoUrl: photoUrl ?? this.photoUrl,
       userRole: userRole ?? this.userRole,
       lastLocation: lastLocation ?? this.lastLocation,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
     );
   }
 
@@ -76,6 +85,7 @@ class User {
       'photo_url': photoUrl,
       'user_role': userRole,
       'last_location': lastLocation,
+      'last_seen_at': lastSeenAt?.toIso8601String(),
     };
   }
 }

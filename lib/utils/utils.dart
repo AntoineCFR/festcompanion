@@ -68,6 +68,16 @@ class AppUtils {
     return parts.map(getDjImagePath).toList();
   }
 
+  /// Durée écoulée depuis [date] en français, pour l'info-bulle de la carte
+  /// (ex. "à l'instant", "il y a 23 min", "il y a 3 h").
+  static String relativeTime(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) return "à l'instant";
+    if (diff.inMinutes < 60) return 'il y a ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'il y a ${diff.inHours} h';
+    return 'il y a ${diff.inDays} j';
+  }
+
   static String formatFullDate(DateTime date) {
     final days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
     final months = [

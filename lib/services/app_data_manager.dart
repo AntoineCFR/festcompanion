@@ -784,6 +784,7 @@ class AppDataManager {
         lastLat: lat,
         lastLng: lng,
         lastLocation: stage ?? _users[index].lastLocation,
+        lastSeenAt: DateTime.now(),
       );
     }
   }
@@ -1022,10 +1023,16 @@ class AppDataManager {
           lonArd: coordinates['lon_ard']?.toDouble(),
           latRallyPoint: coordinates['lat_rally_point']?.toDouble(),
           lonRallyPoint: coordinates['lon_rally_point']?.toDouble(),
+          mapAnchorX: coordinates['map_anchor_x']?.toDouble(),
+          mapAnchorY: coordinates['map_anchor_y']?.toDouble(),
+          mapExclusionRadius: coordinates['map_exclusion_radius']?.toDouble(),
         );
       }
 
-      await ApiService.updateStage(stageName, coordinates);
+      if (_userId == null) {
+        throw Exception('Aucun utilisateur connecté.');
+      }
+      await ApiService.updateStage(stageName, coordinates, userId: _userId!);
       if (fid != null) await LocalStorageService().saveStages(_stages, fid);
     } catch (e) {
       _showErrorMessage('Impossible de mettre à jour la scène.');

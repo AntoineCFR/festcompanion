@@ -4,6 +4,8 @@ import '../models/stage_model.dart';
 import '../models/user_model.dart';
 import '../services/app_data_manager.dart';
 import '../helpers/location_helper.dart';
+import 'map_page.dart' show festivalMapAssets;
+import 'map_calibration_page.dart';
 import '../widgets/stages/stage_card.dart';
 import '../widgets/shared/festival_background.dart';
 
@@ -187,6 +189,12 @@ class _StagesPageState extends State<StagesPage> {
       'lon_ard': stage.lonArd,
       'lat_rally_point': stage.latRallyPoint,
       'lon_rally_point': stage.lonRallyPoint,
+      // Non concernés par l'édition d'un coin GPS, mais `update_bigquery_stage`
+      // attend un snapshot complet des `_STAGE_COLS` (sinon KeyError côté API)
+      // → on renvoie les valeurs actuelles inchangées.
+      'map_anchor_x': stage.mapAnchorX,
+      'map_anchor_y': stage.mapAnchorY,
+      'map_exclusion_radius': stage.mapExclusionRadius,
     };
 
     // Met à jour selon le coin
@@ -279,6 +287,15 @@ class _StagesPageState extends State<StagesPage> {
           onSetCoordinates: _setCoordinates,
           onSetCoordinatesManual: _setCoordinatesManual,
           onOpenInMaps: _openInGoogleMaps,
+          onCalibrateMap: festivalMapAssets.containsKey(
+                  AppDataManager().selectedFestivalId)
+              ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MapCalibrationPage(stage: stage),
+                    ),
+                  )
+              : null,
         );
       },
     );

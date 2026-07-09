@@ -40,6 +40,7 @@ flutter:
     - .env
     - lib/assets/
     - lib/assets/backgrounds/
+    - lib/assets/maps/
 
 flutter_launcher_icons:
   android: true

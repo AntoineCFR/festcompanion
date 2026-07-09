@@ -17,6 +17,10 @@ class StageCard extends StatefulWidget {
   /// Saisie manuelle : (nom de scène, coin, latitude, longitude).
   final Function(String, String, double, double) onSetCoordinatesManual;
   final Function(double, double) onOpenInMaps;
+  /// Ouvre l'écran de calibration de la position sur la carte illustrée
+  /// (onglet Map). Optionnel : absent si la carte n'est pas disponible pour
+  /// ce festival.
+  final VoidCallback? onCalibrateMap;
   final bool initiallyExpanded;
 
   const StageCard({
@@ -26,6 +30,7 @@ class StageCard extends StatefulWidget {
     required this.onSetCoordinates,
     required this.onSetCoordinatesManual,
     required this.onOpenInMaps,
+    this.onCalibrateMap,
     this.initiallyExpanded = false,
   });
 
@@ -363,18 +368,32 @@ class _StageCardState extends State<StageCard> {
           ],
         ),
         const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: _openManualEntry,
-            icon: const Icon(Icons.edit_location_alt, size: 16),
-            label: const Text('Saisie manuelle'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white24),
-              visualDensity: VisualDensity.compact,
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: _openManualEntry,
+              icon: const Icon(Icons.edit_location_alt, size: 16),
+              label: const Text('Saisie manuelle'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white24),
+                visualDensity: VisualDensity.compact,
+              ),
             ),
-          ),
+            if (widget.onCalibrateMap != null)
+              OutlinedButton.icon(
+                onPressed: widget.onCalibrateMap,
+                icon: const Icon(Icons.map, size: 16),
+                label: const Text('Calibrer sur la carte'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white24),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 14),
         _buildCoordTable(),

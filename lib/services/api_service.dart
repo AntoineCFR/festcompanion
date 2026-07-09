@@ -475,14 +475,16 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> updateStage(String stageName, Map<String, dynamic> coordinates, {int? festivalId}) async {
+  static Future<Map<String, dynamic>> updateStage(
+      String stageName, Map<String, dynamic> coordinates,
+      {required int userId, int? festivalId}) async {
     try {
       final fid = _requireFestival(festivalId);
       final url = Uri.parse('$_baseUrl/api/stages/$stageName');
       final response = await _client.put(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'festival_id': fid, ...coordinates}),
+        body: json.encode({'festival_id': fid, 'user_id': userId, ...coordinates}),
       );
 
       if (response.statusCode == 200) {
