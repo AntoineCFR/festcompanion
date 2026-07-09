@@ -9,6 +9,7 @@ import '../../pages/journal_page.dart';
 import '../../pages/festival_selection_page.dart';
 import '../../pages/theme_page.dart';
 import '../../pages/about_page.dart';
+import '../../models/user_model.dart';
 import '../../services/app_data_manager.dart';
 
 class MainDrawer extends StatelessWidget {
@@ -47,6 +48,18 @@ class MainDrawer extends StatelessWidget {
   void _push(BuildContext context, Widget page) {
     Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
+
+  /// Même repli/convention que AdminPanelPage/StagesPage : rôle lu depuis le
+  /// cache utilisateurs (chargé en tâche de fond dès la connexion). Réactif
+  /// via [AppDataManager.dataRevision] au cas où le drawer s'ouvre avant la
+  /// fin de ce chargement.
+  bool get _isAdmin {
+    final user = AppDataManager().users.firstWhere(
+          (u) => u.id == userId,
+          orElse: () => User(id: -1, username: '', userRole: 'user'),
+        );
+    return user.userRole == 'admin';
   }
 
   @override
@@ -115,11 +128,6 @@ class MainDrawer extends StatelessWidget {
               label: 'Scènes',
               onTap: () =>
                   _push(context, StagesPage(username: username, userId: userId))),
-          _tile(context,
-              icon: Icons.admin_panel_settings,
-              label: 'Administration',
-              onTap: () => _push(context,
-                  AdminPanelPage(username: username, userId: userId))),
 
           const Divider(color: Colors.white24),
 
@@ -133,6 +141,16 @@ class MainDrawer extends StatelessWidget {
               icon: Icons.palette,
               label: 'Thème',
               onTap: () => _push(context, const ThemePage())),
+          ValueListenableBuilder<int>(
+            valueListenable: AppDataManager().dataRevision,
+            builder: (context, _, _) => _isAdmin
+                ? _tile(context,
+                    icon: Icons.admin_panel_settings,
+                    label: 'Administration',
+                    onTap: () => _push(context,
+                        AdminPanelPage(username: username, userId: userId)))
+                : const SizedBox.shrink(),
+          ),
           _tile(context,
               icon: Icons.info_outline,
               label: 'À propos',

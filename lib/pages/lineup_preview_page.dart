@@ -28,19 +28,23 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
   final Set<String> _excludedKeys = {};
   bool _busy = false;
 
-  static const _typeOrder = [
-    'added',
-    'rescheduled',
-    'restored',
-    'cancelled',
-    'updated',
-  ];
   static const _typeLabels = {
     'added': 'Ajouté',
     'rescheduled': 'Reprogrammé',
     'restored': 'Restauré',
     'cancelled': 'Annulé',
     'updated': 'Modifié',
+  };
+
+  /// Icône de la partie droite de la ligne, ramenée aux 3 catégories
+  /// visuelles ajout / modification / annulation (`restored` = un set
+  /// redevenu actif après une annulation, regroupé avec "ajout").
+  static const _typeIcons = {
+    'added': (Icons.add_circle, Colors.greenAccent),
+    'restored': (Icons.add_circle, Colors.greenAccent),
+    'rescheduled': (Icons.edit, Colors.orangeAccent),
+    'updated': (Icons.edit, Colors.orangeAccent),
+    'cancelled': (Icons.cancel, Colors.redAccent),
   };
 
   /// `.isoformat()` côté backend ne porte pas de timezone alors que la valeur
@@ -73,7 +77,7 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
   }
 
   static const _fieldLabels = {
-    'host': 'Collectif',
+    'host': 'Stage host',
     'stage_order': 'Ordre scène',
     'dj': 'DJ',
     'stage': 'Scène',
@@ -99,12 +103,55 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
     }).join(' · ');
   }
 
-  Map<String, List<Map<String, dynamic>>> get _grouped {
-    final map = <String, List<Map<String, dynamic>>>{};
+  /// Heure de passage d'origine : l'ancien horaire pour tout ce qui existait
+  /// déjà (reprogrammé/restauré/annulé/modifié), le nouvel horaire pour un
+  /// ajout pur (pas d'"origine" au sens propre).
+  DateTime _originalTime(Map<String, dynamic> c) =>
+      _parseUtc(c['old_start']) ?? _parseUtc(c['new_start']) ?? DateTime(0);
+
+  /// jour -> scène -> changements, triés par heure de passage d'origine.
+  Map<String, Map<String, List<Map<String, dynamic>>>> get _grouped {
+    final byDay = <String, Map<String, List<Map<String, dynamic>>>>{};
     for (final c in widget.changes) {
-      map.putIfAbsent(c['type'] as String? ?? '?', () => []).add(c);
+      final day = c['day'] as String? ?? '?';
+      final stage = c['stage'] as String? ?? '?';
+      byDay
+          .putIfAbsent(day, () => {})
+          .putIfAbsent(stage, () => [])
+          .add(c);
     }
-    return map;
+    for (final stages in byDay.values) {
+      for (final items in stages.values) {
+        items.sort((a, b) => _originalTime(a).compareTo(_originalTime(b)));
+      }
+    }
+    return byDay;
+  }
+
+  /// Jours triés chronologiquement (day_int connu via la timetable actuelle) ;
+  /// un jour tout neuf (pas encore dans la timetable) est ajouté à la suite,
+  /// par ordre alphabétique.
+  List<String> _dayOrder(Set<String> present) {
+    final known =
+        AppDataManager().festivalDays.where(present.contains).toList();
+    final extra = present.difference(known.toSet()).toList()..sort();
+    return [...known, ...extra];
+  }
+
+  /// Scènes triées par ordre explicite (`Stage.stageOrder`, posé dans l'admin
+  /// panel) si disponible, sinon ordre alphabétique.
+  List<String> _stageOrder(Set<String> present) {
+    final explicitOrder = AppDataManager().explicitStageOrder;
+    final stages = present.toList()
+      ..sort((a, b) {
+        final ao = explicitOrder[a];
+        final bo = explicitOrder[b];
+        if (ao != null && bo != null) return ao.compareTo(bo);
+        if (ao != null) return -1;
+        if (bo != null) return 1;
+        return a.toLowerCase().compareTo(b.toLowerCase());
+      });
+    return stages;
   }
 
   bool _isExcluded(Map<String, dynamic> c) => _excludedKeys.contains(c['key']);
@@ -120,7 +167,7 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
     });
   }
 
-  void _toggleType(List<Map<String, dynamic>> items, bool select) {
+  void _toggleGroup(List<Map<String, dynamic>> items, bool select) {
     setState(() {
       for (final c in items) {
         final key = c['key'] as String;
@@ -136,7 +183,7 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
   @override
   Widget build(BuildContext context) {
     final grouped = _grouped;
-    final types = _typeOrder.where((t) => grouped.containsKey(t)).toList();
+    final days = _dayOrder(grouped.keys.toSet());
     final total = widget.changes.length;
     final selectedCount = total - _excludedKeys.length;
 
@@ -151,7 +198,7 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            for (final type in types) ..._buildTypeSection(type, grouped[type]!),
+            for (final day in days) ..._buildDaySection(day, grouped[day]!),
           ],
         ),
       ),
@@ -173,16 +220,19 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
     );
   }
 
-  List<Widget> _buildTypeSection(String type, List<Map<String, dynamic>> items) {
-    final allSelected = items.every((c) => !_isExcluded(c));
+  List<Widget> _buildDaySection(
+      String day, Map<String, List<Map<String, dynamic>>> byStage) {
+    final dayItems = byStage.values.expand((l) => l).toList();
+    final allSelected = dayItems.every((c) => !_isExcluded(c));
+    final stages = _stageOrder(byStage.keys.toSet());
     return [
       Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 4),
+        padding: const EdgeInsets.only(top: 16, bottom: 4),
         child: Row(
           children: [
             Expanded(
               child: Text(
-                '${_typeLabels[type] ?? type} (${items.length})',
+                '${AppUtils.getDayName(day)} (${dayItems.length})',
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -191,10 +241,28 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
               ),
             ),
             TextButton(
-              onPressed: () => _toggleType(items, !allSelected),
+              onPressed: () => _toggleGroup(dayItems, !allSelected),
               child: Text(allSelected ? 'Tout décocher' : 'Tout cocher'),
             ),
           ],
+        ),
+      ),
+      for (final stage in stages) ..._buildStageSection(stage, byStage[stage]!),
+    ];
+  }
+
+  List<Widget> _buildStageSection(
+      String stage, List<Map<String, dynamic>> items) {
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 2, left: 4),
+        child: Text(
+          stage,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+            fontSize: 12.5,
+          ),
         ),
       ),
       for (final c in items) _buildRow(c),
@@ -203,6 +271,8 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
 
   Widget _buildRow(Map<String, dynamic> c) {
     final selected = !_isExcluded(c);
+    final type = c['type'] as String? ?? '';
+    final iconSpec = _typeIcons[type];
     return Card(
       color: AppTheme.surface,
       margin: const EdgeInsets.only(bottom: 6),
@@ -214,10 +284,15 @@ class _LineupPreviewPageState extends State<LineupPreviewPage> {
         title: Text(c['dj'] as String? ?? '',
             style: const TextStyle(color: Colors.white)),
         subtitle: Text(
-          '${c['stage'] ?? ''} · ${AppUtils.getDayName(c['day'] as String? ?? '')} · '
-          '${_timeRangeLabel(c)}',
+          _timeRangeLabel(c),
           style: const TextStyle(color: Colors.white70, fontSize: 12.5),
         ),
+        secondary: iconSpec == null
+            ? null
+            : Tooltip(
+                message: _typeLabels[type] ?? type,
+                child: Icon(iconSpec.$1, color: iconSpec.$2),
+              ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../models/festival_model.dart';
 import '../models/stage_model.dart';
 import '../models/timetable_item.dart';
 import '../models/user_model.dart';
@@ -570,21 +571,123 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     );
   }
 
-  Future<DateTime?> _pickDateTime(DateTime? initial) async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial ?? now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 1),
+  static const _weekdayNamesEn = [
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+  ];
+
+  /// Seuil afterparty : un set dont le début est avant 9h est rattaché à la
+  /// nuit précédente. Même règle que le scraper backend
+  /// (extremalineup-api/scrapers/awakenings.py) — à garder synchronisée.
+  static const _afterpartyCutoffHour = 9;
+
+  /// Jours calendaires du festival (bornes inclusives), à minuit. Étendu d'1
+  /// jour après `end_date` : l'after de la dernière nuit peut déborder sur le
+  /// calendrier du lendemain (ex. Awakenings termine le dimanche mais des
+  /// sets d'after démarrent le lundi matin).
+  List<DateTime> _festivalDays(Festival festival) {
+    final start = DateTime(
+        festival.startDate.year, festival.startDate.month, festival.startDate.day);
+    final end = DateTime(
+            festival.endDate.year, festival.endDate.month, festival.endDate.day)
+        .add(const Duration(days: 1));
+    return [
+      for (var d = start; !d.isAfter(end); d = d.add(const Duration(days: 1))) d,
+    ];
+  }
+
+  /// Déduit le jour festival (nom + n°) à partir du jour calendaire et de
+  /// l'heure de DÉBUT choisis : avant [_afterpartyCutoffHour] -> nuit
+  /// précédente (afterparty), sinon jour même. Borné au 1er jour du festival
+  /// (pas de nuit avant l'ouverture).
+  ({String day, int dayInt}) _festivalDayInfo(
+      DateTime calendarDay, int hour, Festival festival) {
+    final firstDay = DateTime(
+        festival.startDate.year, festival.startDate.month, festival.startDate.day);
+    var nightDate = hour < _afterpartyCutoffHour
+        ? calendarDay.subtract(const Duration(days: 1))
+        : calendarDay;
+    if (nightDate.isBefore(firstDay)) nightDate = firstDay;
+    final dayInt = nightDate.difference(firstDay).inDays + 1;
+    return (day: _weekdayNamesEn[nightDate.weekday - 1], dayInt: dayInt);
+  }
+
+  /// Ligne "jour / heure / minute" bornée aux jours du festival (heure et
+  /// minute non bornées, un set peut débuter/finir à n'importe quelle heure).
+  Widget _dayHourMinuteRow({
+    required String label,
+    required List<DateTime> days,
+    required DateTime selectedDay,
+    required int selectedHour,
+    required int selectedMinute,
+    required void Function(DateTime) onDayChanged,
+    required void Function(int) onHourChanged,
+    required void Function(int) onMinuteChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: DropdownButton<DateTime>(
+                value: selectedDay,
+                isExpanded: true,
+                dropdownColor: AppTheme.surface,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                items: days
+                    .map((d) => DropdownMenuItem(
+                          value: d,
+                          child:
+                              Text('${AppUtils.getWeekdayName(d)} ${d.day}/${d.month}'),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) onDayChanged(v);
+                },
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              flex: 2,
+              child: DropdownButton<int>(
+                value: selectedHour,
+                isExpanded: true,
+                dropdownColor: AppTheme.surface,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                items: [
+                  for (var h = 0; h < 24; h++)
+                    DropdownMenuItem(
+                        value: h, child: Text('${h.toString().padLeft(2, '0')}h')),
+                ],
+                onChanged: (v) {
+                  if (v != null) onHourChanged(v);
+                },
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              flex: 2,
+              child: DropdownButton<int>(
+                value: selectedMinute,
+                isExpanded: true,
+                dropdownColor: AppTheme.surface,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                items: [
+                  for (var m = 0; m < 60; m++)
+                    DropdownMenuItem(
+                        value: m, child: Text(m.toString().padLeft(2, '0'))),
+                ],
+                onChanged: (v) {
+                  if (v != null) onMinuteChanged(v);
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
     );
-    if (date == null || !mounted) return null;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial ?? now),
-    );
-    if (time == null) return null;
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
   Future<void> _setFormDialog({TimetableItem? existing}) async {
@@ -594,170 +697,183 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
           .showSnackBar('Aucune scène disponible — créez-en une d\'abord.');
       return;
     }
+    final festival = AppDataManager().selectedFestival;
+    if (festival == null) {
+      AppDataManager().showSnackBar('Aucun festival sélectionné.');
+      return;
+    }
+    // Le backend renvoie déjà start_time/end_time décalés de l'offset du
+    // festival (`GET /timetable` fait `df['start_time'] += offset`, cf.
+    // app.py) : ces champs sont donc déjà "heure locale festival" telle
+    // quelle, jamais de l'UTC brut à reconvertir ici. Le front reste en
+    // heure de l'appareil (identique à l'ancien comportement) — la
+    // conversion UTC ne se fait qu'entre le front et le backend, jamais dans
+    // ce formulaire : voir `_to_naive_utc` côté API pour le sens inverse.
+    final festivalDays = _festivalDays(festival);
+    DateTime calendarDayOf(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
+    DateTime clampToFestival(DateTime day) =>
+        festivalDays.any((d) => d == day) ? day : festivalDays.first;
 
     final djCtrl = TextEditingController(text: existing?.dj);
     final hostCtrl = TextEditingController(text: existing?.host);
-    final dayCtrl = TextEditingController(text: existing?.day);
-    final dayIntCtrl =
-        TextEditingController(text: existing?.dayInt.toString());
     final bioCtrl = TextEditingController(text: existing?.bio);
     // Repli sur la 1re scène si celle du set édité n'existe plus (renommée /
     // supprimée depuis) : évite un crash du Dropdown (valeur hors liste).
     String selectedStage = stages.any((s) => s.stage == existing?.stage)
         ? existing!.stage
         : stages.first.stage;
-    DateTime? start = existing?.startTime;
-    DateTime? end = existing?.endTime;
+
+    DateTime startDay = existing != null
+        ? clampToFestival(calendarDayOf(existing.startTime))
+        : festivalDays.first;
+    int startHour = existing?.startTime.hour ?? 20;
+    int startMinute = existing?.startTime.minute ?? 0;
+    DateTime endDay = existing != null
+        ? clampToFestival(calendarDayOf(existing.endTime))
+        : festivalDays.first;
+    int endHour = existing?.endTime.hour ?? 21;
+    int endMinute = existing?.endTime.minute ?? 0;
     String? error;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: AppTheme.surface,
-          title: Text(existing == null ? 'Nouveau set' : 'Modifier le set',
-              style: const TextStyle(color: Colors.white, fontSize: 17)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: djCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'DJ',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButton<String>(
-                  value: selectedStage,
-                  isExpanded: true,
-                  dropdownColor: AppTheme.surface,
-                  style: const TextStyle(color: Colors.white),
-                  items: stages
-                      .map((s) => DropdownMenuItem(
-                            value: s.stage,
-                            child: Text(s.stage),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setDialogState(() => selectedStage = v);
-                  },
-                ),
-                TextField(
-                  controller: hostCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Collectif (optionnel)',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                TextField(
-                  controller: dayCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Jour',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                TextField(
-                  controller: dayIntCtrl,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Jour n° (0 = premier)',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                TextField(
-                  controller: bioCtrl,
-                  maxLines: 2,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Bio (optionnel)',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    start == null
-                        ? 'Début'
-                        : 'Début : ${AppUtils.formatTime(start!)}',
+        builder: (ctx, setDialogState) {
+          final dayInfo = _festivalDayInfo(startDay, startHour, festival);
+          return AlertDialog(
+            backgroundColor: AppTheme.surface,
+            title: Text(existing == null ? 'Nouveau set' : 'Modifier le set',
+                style: const TextStyle(color: Colors.white, fontSize: 17)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: djCtrl,
                     style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'DJ',
+                      labelStyle: TextStyle(color: Colors.white70),
+                    ),
                   ),
-                  trailing:
-                      const Icon(Icons.schedule, color: Colors.white70),
-                  onTap: () async {
-                    final picked = await _pickDateTime(start);
-                    if (picked != null) setDialogState(() => start = picked);
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    end == null ? 'Fin' : 'Fin : ${AppUtils.formatTime(end!)}',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  trailing:
-                      const Icon(Icons.schedule, color: Colors.white70),
-                  onTap: () async {
-                    final picked = await _pickDateTime(end);
-                    if (picked != null) setDialogState(() => end = picked);
-                  },
-                ),
-                if (error != null) ...[
                   const SizedBox(height: 8),
-                  Text(error!,
-                      style: const TextStyle(
-                          color: Colors.redAccent, fontSize: 12)),
+                  const Text('Scène',
+                      style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  DropdownButton<String>(
+                    value: selectedStage,
+                    isExpanded: true,
+                    dropdownColor: AppTheme.surface,
+                    style: const TextStyle(color: Colors.white),
+                    items: stages
+                        .map((s) => DropdownMenuItem(
+                              value: s.stage,
+                              child: Text(s.stage),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => selectedStage = v);
+                    },
+                  ),
+                  TextField(
+                    controller: hostCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Stage host (optionnel)',
+                      labelStyle: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                  TextField(
+                    controller: bioCtrl,
+                    maxLines: 2,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Bio (optionnel)',
+                      labelStyle: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _dayHourMinuteRow(
+                    label: 'Début',
+                    days: festivalDays,
+                    selectedDay: startDay,
+                    selectedHour: startHour,
+                    selectedMinute: startMinute,
+                    onDayChanged: (v) => setDialogState(() => startDay = v),
+                    onHourChanged: (v) => setDialogState(() => startHour = v),
+                    onMinuteChanged: (v) => setDialogState(() => startMinute = v),
+                  ),
+                  const SizedBox(height: 12),
+                  _dayHourMinuteRow(
+                    label: 'Fin',
+                    days: festivalDays,
+                    selectedDay: endDay,
+                    selectedHour: endHour,
+                    selectedMinute: endMinute,
+                    onDayChanged: (v) => setDialogState(() => endDay = v),
+                    onHourChanged: (v) => setDialogState(() => endHour = v),
+                    onMinuteChanged: (v) => setDialogState(() => endMinute = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Jour festival : ${AppUtils.getDayName(dayInfo.day)} (n°${dayInfo.dayInt})',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(error!,
+                        style: const TextStyle(
+                            color: Colors.redAccent, fontSize: 12)),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (djCtrl.text.trim().isEmpty ||
-                    dayCtrl.text.trim().isEmpty ||
-                    int.tryParse(dayIntCtrl.text.trim()) == null ||
-                    start == null ||
-                    end == null) {
-                  setDialogState(() => error =
-                      'DJ, jour, jour n° et horaires sont requis (jour n° = nombre).');
-                  return;
-                }
-                if (!end!.isAfter(start!)) {
-                  setDialogState(
-                      () => error = 'La fin doit être après le début.');
-                  return;
-                }
-                Navigator.pop(ctx, true);
-              },
-              child: Text(existing == null ? 'Créer' : 'Enregistrer'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (djCtrl.text.trim().isEmpty) {
+                    setDialogState(() => error = 'Le DJ est requis.');
+                    return;
+                  }
+                  final start = DateTime(startDay.year, startDay.month,
+                      startDay.day, startHour, startMinute);
+                  final end = DateTime(endDay.year, endDay.month, endDay.day,
+                      endHour, endMinute);
+                  if (!end.isAfter(start)) {
+                    setDialogState(
+                        () => error = 'La fin doit être après le début.');
+                    return;
+                  }
+                  Navigator.pop(ctx, true);
+                },
+                child: Text(existing == null ? 'Créer' : 'Enregistrer'),
+              ),
+            ],
+          );
+        },
       ),
     );
     if (confirmed != true || !mounted) return;
+
+    final start = DateTime(
+        startDay.year, startDay.month, startDay.day, startHour, startMinute);
+    final end =
+        DateTime(endDay.year, endDay.month, endDay.day, endHour, endMinute);
+    final dayInfo = _festivalDayInfo(startDay, startHour, festival);
 
     final data = <String, dynamic>{
       'dj': djCtrl.text.trim(),
       'stage': selectedStage,
       'host': hostCtrl.text.trim(),
-      'day': dayCtrl.text.trim(),
-      'day_int': int.parse(dayIntCtrl.text.trim()),
+      'day': dayInfo.day,
+      'day_int': dayInfo.dayInt,
       'bio': bioCtrl.text.trim().isEmpty ? null : bioCtrl.text.trim(),
-      'start_time': start!.toUtc().toIso8601String(),
-      'end_time': end!.toUtc().toIso8601String(),
+      'start_time': start.toUtc().toIso8601String(),
+      'end_time': end.toUtc().toIso8601String(),
     };
 
     setState(() => _busy = true);
