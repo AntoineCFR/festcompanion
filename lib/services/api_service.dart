@@ -204,6 +204,7 @@ class ApiService {
           'last_lat': user['last_lat'] ?? 0.0,
           'last_lng': user['last_lng'] ?? 0.0,
           'last_location': user['last_location'] ?? '?',
+          'last_seen_at': user['last_seen_at'],
           // Tente : on garde le null (pas de défaut (0,0)) pour distinguer
           // « pas de tente » d'une vraie position.
           'tent_lat': user['tent_lat'],
