@@ -29,14 +29,38 @@ const double _ringGap = 0.022;
 
 const double _avatarRadius = 12;
 
-class MapPage extends StatefulWidget {
+/// Liseret autour de chaque avatar pour le repérer facilement sur la carte
+/// (jaune électrique : contraste fort avec le vert/bleu de l'illustration et
+/// avec le rouge déjà utilisé pour les pictogrammes de scène).
+const Color _avatarHighlightColor = Color(0xFFFFEA00);
+
+/// Page plein écran « Map » (utilisée hors bottom-nav si besoin).
+class MapPage extends StatelessWidget {
   const MapPage({super.key});
 
   @override
-  State<MapPage> createState() => _MapPageState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        title: const Text('Map'),
+        backgroundColor: AppTheme.surface,
+      ),
+      body: const MapView(),
+    );
+  }
 }
 
-class _MapPageState extends State<MapPage> {
+/// Contenu « Map » (sans Scaffold) → onglet du bottom-nav. Avatars des users
+/// positionnés autour de leur scène courante sur l'illustration du festival.
+class MapView extends StatefulWidget {
+  const MapView({super.key});
+
+  @override
+  State<MapView> createState() => _MapViewState();
+}
+
+class _MapViewState extends State<MapView> {
   bool _isLoading = true;
 
   @override
@@ -68,28 +92,97 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  void _showUserInfo(User user) {
+  /// Bulle d'info flottante ancrée au-dessus du point tapé, plutôt qu'une
+  /// pop-up plein écran : se ferme en tapant n'importe où ailleurs.
+  void _showUserBubble(User user, Offset globalPosition) {
+    final overlay = Overlay.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    late OverlayEntry entry;
+
     final stageLabel =
         user.lastLocation == '?' ? 'position inconnue' : user.lastLocation;
     final seen = user.lastSeenAt != null
         ? AppUtils.relativeTime(user.lastSeenAt!)
         : 'jamais localisé';
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: Text(user.username,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-        content: Text('$stageLabel — $seen',
-            style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
+
+    const bubbleWidth = 220.0;
+    final left = (globalPosition.dx - bubbleWidth / 2)
+        .clamp(8.0, math.max(8.0, screenSize.width - bubbleWidth - 8.0))
+        .toDouble();
+    final bottom = screenSize.height - globalPosition.dy + _avatarRadius + 10;
+
+    entry = OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          // Zone transparente plein écran : un tap n'importe où ailleurs
+          // referme la bulle sans interagir avec la carte en dessous.
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => entry.remove(),
+            ),
+          ),
+          Positioned(
+            left: left,
+            bottom: bottom,
+            width: bubbleWidth,
+            child: IgnorePointer(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 140),
+                curve: Curves.easeOut,
+                builder: (context, t, child) => Opacity(
+                  opacity: t,
+                  child: Transform.scale(
+                    scale: 0.9 + 0.1 * t,
+                    alignment: Alignment.bottomCenter,
+                    child: child,
+                  ),
+                ),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.username,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$stageLabel — $seen',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
+
+    overlay.insert(entry);
   }
 
   /// Décalages (fractions de la largeur image) d'un anneau d'avatars autour
@@ -155,8 +248,20 @@ class _MapPageState extends State<MapPage> {
           left: center.dx - _avatarRadius,
           top: center.dy - _avatarRadius,
           child: GestureDetector(
-            onTap: () => _showUserInfo(user),
-            child: UserAvatar(user: user, radius: _avatarRadius),
+            onTapUp: (details) => _showUserBubble(user, details.globalPosition),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: _avatarHighlightColor, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _avatarHighlightColor.withValues(alpha: 0.6),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
+              child: UserAvatar(user: user, radius: _avatarRadius),
+            ),
           ),
         ));
       }
@@ -169,13 +274,9 @@ class _MapPageState extends State<MapPage> {
     final festivalId = AppDataManager().selectedFestivalId;
     final assetPath = festivalId != null ? festivalMapAssets[festivalId] : null;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: const Text('Map'),
-        backgroundColor: AppTheme.surface,
-      ),
-      body: _isLoading && AppDataManager().stages.isEmpty
+    return Container(
+      color: AppTheme.background,
+      child: _isLoading && AppDataManager().stages.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : assetPath == null
               ? const Center(

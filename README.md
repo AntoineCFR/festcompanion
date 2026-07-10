@@ -90,6 +90,11 @@ This repository contains the **Flutter client**. The companion REST API lives in
 - **Foreground-only** location: a member's position refreshes when they open the app (or tap a "lost" alert) — no background tracking, so permissions stay simple and the battery is spared.
 - See where every group member currently is — no need to text "where r u??".
 
+### 🗺️ Map
+- A bottom-nav **Map** tab renders the festival's illustrated ground map, with every member's avatar scattered in a small ring around their current stage — grouped by stage rather than projected from raw GPS, since the artwork is stylized, not geo-accurate.
+- Tap an avatar for a lightweight floating bubble (not a full-screen dialog) showing who it is, their stage, and how long ago they were last seen — dismissed by tapping anywhere else.
+- Pinch-to-zoom/pan (`InteractiveViewer`) to read the map's fine print (facilities, camping, stage pictograms) without avatars covering it.
+
 ### 🚨 Real-time group alerts (push)
 Three one-tap event types broadcast to everyone via Firebase Cloud Messaging:
 - **SOS** — high-priority emergency alert (dedicated Android channel, long vibration).
@@ -117,6 +122,7 @@ Three one-tap event types broadcast to everyone via Firebase Cloud Messaging:
 ### 🛠️ Admin panel
 - Drawer-accessible **Administration** screen (role-gated: content only renders for `user_role == 'admin'`), with **Scènes** and **Sets** tabs.
 - **Stages**: create, rename and delete, sorted by display order. A stage carries a stable `stage_id`, so renaming it propagates to every timetable set already linked instead of breaking the link (previously matched by name only). A stage's display order can be set explicitly instead of only being derived from its sets — useful for a brand-new stage with none yet.
+- **Map calibration**: a "Calibrer sur la carte" action per stage opens a screen showing the festival map — tap to place the stage's anchor point, drag a slider to size its exclusion radius (the zone the Map tab keeps free of avatars, so it never covers the stage's pictogram/name).
 - **Sets**: manually create, edit and soft-delete a timetable entry, grouped by day then stage (in display order) and sorted by start time.
 - **Line-up preview**: a full-screen diff of what the scraper would change — grouped by change type, before/after schedule shown per entry, with a checkbox per entry (and a bulk toggle per group) to exclude specific changes before applying. Applying reuses the exact same sync path as the automatic scraper (including the anti-mass-cancellation guard), so a partial apply can't skip that safety net.
 
@@ -286,12 +292,40 @@ flutter pub run flutter_launcher_icons
 Ideas not yet implemented:
 - **Per-festival FCM topics** (currently a single global `all_users` topic) so alerts only reach attendees of the same event.
 - Polygon-based stage detection (currently bounding-box) for irregular stage areas.
-- Map view with live friend pins instead of stage labels.
+- Map view for festivals beyond Awakenings — currently a single bundled illustration (`festivalMapAssets`), would need a remote-hosted image per festival to scale without an app update each time.
 - Migrate state to a reactive solution (Riverpod/Bloc) if the app grows.
 
 ---
 
 ## Release notes
+
+### 1.9.0 — 2026-07-10
+- **Map tab.** New bottom-nav screen showing the festival's illustrated ground
+  map with every member's avatar in a small ring around their current stage
+  (grouped by stage, not projected from raw GPS — the artwork isn't
+  geo-accurate). Tap an avatar for a floating info bubble (who, stage, time
+  since last seen) instead of a full-screen dialog; pinch-to-zoom/pan to read
+  the map's detail. Stage positions are set per festival by an admin via a new
+  **"Calibrer sur la carte"** screen (tap to place the anchor, slider for the
+  exclusion radius kept free of avatars).
+- **Search → Artistes.** The bottom-nav *Search* tab and the drawer swapped
+  places: **Artistes** (renamed from Search, same DJ search/filter behaviour)
+  now lives in the drawer with its own back button; **Map** takes the freed-up
+  bottom-nav slot, using the icon Search used to sit next to.
+- **Fix (data loss, since 1.6.0):** saving a stage's GPS corner/rally point
+  from the admin panel was silently rejected by the API (`user_id is
+  required`) on every attempt — `ApiService.updateStage` never actually sent
+  it. `AppDataManager` already knows the signed-in user, so it's now threaded
+  through automatically; no caller-side change needed.
+- **Fix (backend):** a stage's map anchor/exclusion radius looked saved (the
+  API returned 200) but was never actually written to BigQuery — the
+  `UPDATE`'s `SET` clause was hard-coded to the original coordinate columns
+  and silently ignored the new ones. The clause is now generated from the
+  same column list used to build the query parameters, so the two can't drift
+  apart again.
+- **Fix:** a user's "last seen" timestamp was returned by `/users` but
+  dropped while reshaping the response client-side, so the Map bubble always
+  read "jamais localisé" regardless of the real data.
 
 ### 1.8.0 — 2026-07-08
 - **Admin panel.** New role-gated **Administration** screen (drawer entry): manage stages (create/rename/delete, explicit display order) and timetable sets (create/edit/soft-delete) by hand, without touching BigQuery directly.

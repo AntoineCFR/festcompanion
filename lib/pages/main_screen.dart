@@ -9,7 +9,7 @@ import 'events_page.dart';
 import 'lineup_page.dart';
 import 'timetable_page.dart';
 import 'trending_page.dart';
-import 'search_page.dart';
+import 'map_page.dart';
 import '../widgets/main/main_drawer.dart';
 import '../widgets/main/main_app_bar.dart';
 import '../widgets/main/main_bottom_nav_bar.dart';
@@ -140,7 +140,7 @@ class _MainScreenState extends State<MainScreen> {
           LineupPage(username: widget.username, userId: widget.userId),
           TimetablePage(username: widget.username, userId: widget.userId),
           const TrendingView(),
-          const SearchView(),
+          const MapView(),
         ],
       ),
       bottomNavigationBar: MainBottomNavBar(

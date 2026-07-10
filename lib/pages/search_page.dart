@@ -8,8 +8,8 @@ import '../widgets/lineup/dj_list_tile.dart';
 import '../widgets/shared/festival_background.dart';
 import 'djprofilepage.dart';
 
-/// Page plein écran « Search » (utilisée en navigation depuis une fiche DJ,
-/// pré-filtrée sur un tag).
+/// Page plein écran « Artistes » (accessible depuis le drawer, et en
+/// navigation depuis une fiche DJ pré-filtrée sur un tag).
 class SearchPage extends StatelessWidget {
   final String? initialTag;
 
@@ -19,7 +19,7 @@ class SearchPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: AppBar(title: const Text('Search')),
+      appBar: AppBar(title: const Text('Artistes')),
       body: SearchView(initialTag: initialTag),
     );
   }

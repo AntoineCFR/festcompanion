@@ -105,6 +105,10 @@ class _MapCalibrationPageState extends State<MapCalibrationPage> {
                       child: CalibratedMapImage(
                         assetPath: assetPath,
                         overlayBuilder: (size) => GestureDetector(
+                          // Sans ça, seules les zones réellement peintes (le
+                          // petit cercle) captent le tap — le reste de
+                          // l'image, transparent, l'ignore silencieusement.
+                          behavior: HitTestBehavior.opaque,
                           onTapUp: (details) => _onTapUp(details, size),
                           child: Stack(
                             fit: StackFit.expand,

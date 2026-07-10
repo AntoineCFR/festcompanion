@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 /// même si l'image est remplacée) et délègue à [overlayBuilder] la
 /// construction de ce qui est posé dessus, avec la taille réellement rendue
 /// (pour convertir des coordonnées fractionnaires 0-1 en pixels). Partagé par
-/// `MapPage` (marqueurs des avatars) et l'écran de calibration admin (ancre +
+/// `MapView` (marqueurs des avatars) et l'écran de calibration admin (ancre +
 /// rayon d'exclusion éditables).
 class CalibratedMapImage extends StatefulWidget {
   final String assetPath;

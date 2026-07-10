@@ -3,7 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../pages/profile_page.dart';
 import '../../pages/team_page.dart';
-import '../../pages/map_page.dart';
+import '../../pages/search_page.dart';
 import '../../pages/stages_page.dart';
 import '../../pages/admin_panel_page.dart';
 import '../../pages/journal_page.dart';
@@ -125,9 +125,9 @@ class MainDrawer extends StatelessWidget {
               label: 'Équipe',
               onTap: () => _push(context, const TeamPage())),
           _tile(context,
-              icon: Icons.map,
-              label: 'Map',
-              onTap: () => _push(context, const MapPage())),
+              icon: Icons.person_search,
+              label: 'Artistes',
+              onTap: () => _push(context, const SearchPage())),
           _tile(context,
               icon: Icons.location_city,
               label: 'Scènes',
